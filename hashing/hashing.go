@@ -84,6 +84,6 @@ func GenerateHashList(fileName string) [][32]byte {
 	close(hashChannel)
 	wg2.Wait()
 
-	fmt.Println("Results: ", results)
+	// fmt.Println("Results: ", results)
 	return results
 }

@@ -6,13 +6,13 @@ import (
 	"os"
 )
 
+// FileObject is a convenience wrapper to a persistent store object.
 type FileObject struct {
-	filePath string
-	object   interface{}
-	confirm  bool
+	FileName string
+	Object   [][32]byte
 }
 
-var wd string
+var WD string
 
 func fobErr(fob *FileObject, task string, err error) {
 	if err != nil {
@@ -26,33 +26,58 @@ func fobErr(fob *FileObject, task string, err error) {
 }
 
 func writeFob(fob *FileObject) {
-	tmp_name := wd + "/tmp"
-	tmp, err := os.Create(tmp_name)
+	tmpName := WD + "/tmp"
+	tmp, err := os.Create(tmpName)
 	fobErr(fob, "Error creating temp file for object in writeFob", err)
 
 	encoder := gob.NewEncoder(tmp)
-	err = encoder.Encode(fob.object)
+	err = encoder.Encode(fob.Object)
 	fobErr(fob, "Error encoding temp file for object in writeFob", err)
-
 	tmp.Close()
-	err = os.Rename(tmp_name, fob.filePath)
+	err = os.Rename(tmpName, fob.FileName)
 	fobErr(fob, "Error renaming temp file for object in writeFob", err)
 }
 
-//https://medium.com/@kpbird/golang-serialize-struct-using-gob-part-1-e927a6547c00
-func readGob(fob *FileObject) error {
-	file, err := os.Open(filePath)
-	if err == nil {
-		decoder := gob.NewDecoder(file)
-		err = decoder.Decode(object)
-	}
-	file.Close()
-	return err
+func readFob(fob *FileObject) {
+	file, err := os.Open(fob.FileName)
+	fobErr(fob, "Error loading file for object in readFob", err)
+	defer file.Close()
+
+	decoder := gob.NewDecoder(file)
+	err = decoder.Decode(&fob.Object)
+	fobErr(fob, "Error decoding file for object in readFob", err)
 }
 
-func Create_Persistent_Objects() {
-	//write_channel
-	//read_request_channel
-	//write_confirmation_channel
+func readRequests(fChan <-chan *FileObject, rChan chan<- *FileObject) {
+	for x := range fChan {
+		readFob(x)
+		rChan <- x
+	}
+}
 
+func writeRequests(fChan <-chan *FileObject, rChan chan<- *FileObject) {
+	for x := range fChan {
+		writeFob(x)
+		rChan <- x
+	}
+}
+
+// PersistentChannels return the handlers for the persistent fucntions.
+func PersistentChannels() (chan<- *FileObject, <-chan *FileObject, chan<- *FileObject, <-chan *FileObject) {
+	//write_channel
+	writeChan := make(chan *FileObject)
+	//write_confirmation_channel
+	writeConfirmChan := make(chan *FileObject)
+	//read_request_channel
+	readChan := make(chan *FileObject)
+	//read_return_channel
+	readResponseChan := make(chan *FileObject)
+	go readRequests(readChan, readResponseChan)
+	go writeRequests(writeChan, writeConfirmChan)
+	return readChan, readResponseChan, writeChan, writeConfirmChan
+}
+
+// NewFOB returns a new fileObject with the assigned filename for persistent storage.
+func NewFOB(fileName string) *FileObject {
+	return &FileObject{FileName: fileName}
 }
