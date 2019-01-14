@@ -2,27 +2,27 @@ package persistentStore
 
 import (
 	"encoding/gob"
-	log "github.com/sirupsen/logrus"
+	logging "github.com/qubies/DTN/logging"
+	// log "github.com/sirupsen/logrus"
+	"errors"
+	"io/ioutil"
 	"os"
 )
 
 // FileObject is a convenience wrapper to a persistent store object.
 type FileObject struct {
-	FileName string
-	Object   [][32]byte
+	FileName      string
+	Object        interface{}
+	Complete_Chan chan bool
 }
 
 var WD string
+var DATASTORE string
+var writeChan chan *FileObject
+var readChan chan *FileObject
 
 func fobErr(fob *FileObject, task string, err error) {
-	if err != nil {
-		log.WithFields(log.Fields{
-			"task":  task,
-			"error": err,
-			"fob":   fob,
-		}).Error(task)
-		panic(task)
-	}
+	logging.PanicObjectError(fob, task, err)
 }
 
 func writeFob(fob *FileObject) {
@@ -33,6 +33,9 @@ func writeFob(fob *FileObject) {
 	encoder := gob.NewEncoder(tmp)
 	err = encoder.Encode(fob.Object)
 	fobErr(fob, "Error encoding temp file for object in writeFob", err)
+	// not sure if nexessary for this project, This will slow down IO as the File buffers actually get flushed to disk.
+	// The advantage is that once sync returns, the file is on the disk.
+	tmp.Sync()
 	tmp.Close()
 	err = os.Rename(tmpName, fob.FileName)
 	fobErr(fob, "Error renaming temp file for object in writeFob", err)
@@ -44,40 +47,83 @@ func readFob(fob *FileObject) {
 	defer file.Close()
 
 	decoder := gob.NewDecoder(file)
-	err = decoder.Decode(&fob.Object)
+	err = decoder.Decode(fob.Object)
 	fobErr(fob, "Error decoding file for object in readFob", err)
 }
 
-func readRequests(fChan <-chan *FileObject, rChan chan<- *FileObject) {
+func readRequests(fChan <-chan *FileObject) {
 	for x := range fChan {
 		readFob(x)
-		rChan <- x
+		x.Complete_Chan <- true
 	}
 }
 
-func writeRequests(fChan <-chan *FileObject, rChan chan<- *FileObject) {
+func writeRequests(fChan <-chan *FileObject) {
 	for x := range fChan {
 		writeFob(x)
-		rChan <- x
+		x.Complete_Chan <- true
 	}
 }
 
 // PersistentChannels return the handlers for the persistent fucntions.
-func PersistentChannels() (chan<- *FileObject, <-chan *FileObject, chan<- *FileObject, <-chan *FileObject) {
+func initialize() {
 	//write_channel
-	writeChan := make(chan *FileObject)
-	//write_confirmation_channel
-	writeConfirmChan := make(chan *FileObject)
+	writeChan = make(chan *FileObject)
 	//read_request_channel
-	readChan := make(chan *FileObject)
-	//read_return_channel
-	readResponseChan := make(chan *FileObject)
-	go readRequests(readChan, readResponseChan)
-	go writeRequests(writeChan, writeConfirmChan)
-	return readChan, readResponseChan, writeChan, writeConfirmChan
+	readChan = make(chan *FileObject)
+
+	go readRequests(readChan)
+	go writeRequests(writeChan)
 }
 
 // NewFOB returns a new fileObject with the assigned filename for persistent storage.
-func NewFOB(fileName string) *FileObject {
-	return &FileObject{FileName: fileName}
+func NewFOB(fileName string, object interface{}) *FileObject {
+	if writeChan == nil {
+		initialize()
+	}
+	return &FileObject{FileName: fileName, Object: object, Complete_Chan: make(chan bool)}
+}
+
+func (FOB *FileObject) Write() {
+	writeChan <- FOB
+	go func() {
+		<-FOB.Complete_Chan
+	}()
+}
+
+func (FOB *FileObject) Read() {
+	readChan <- FOB
+	go func() {
+		<-FOB.Complete_Chan
+	}()
+}
+func (FOB *FileObject) WriteBlocking() {
+	writeChan <- FOB
+	<-FOB.Complete_Chan
+}
+
+func (FOB *FileObject) ReadBlocking() {
+	readChan <- FOB
+	<-FOB.Complete_Chan
+}
+
+func WriteBytes(fileName string, data []byte) {
+	if _, err := os.Stat(fileName); os.IsNotExist(err) {
+		file, err := os.Create(fileName)
+		logging.PanicObjectError(file, "Creating new data file", err)
+		defer file.Close()
+		_, err = file.Write(data)
+		logging.PanicObjectError(file, "Writing to new data file", err)
+		file.Sync()
+	} else {
+		logging.DuplicateFileWrite(fileName)
+	}
+}
+
+func ReadBytes(fileName string) ([]byte, error) {
+	if _, err := os.Stat(fileName); !os.IsNotExist(err) {
+		return nil, errors.New("File Did Not Exist")
+	}
+	return ioutil.ReadFile(fileName)
+
 }

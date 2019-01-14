@@ -4,12 +4,13 @@ import (
 	"fmt"
 	env "github.com/joho/godotenv"
 	hash "github.com/qubies/DTN/hashing"
+	logging "github.com/qubies/DTN/logging"
 	persist "github.com/qubies/DTN/persistentStore"
-	log "github.com/sirupsen/logrus"
 	"os"
 )
 
 var WD string
+var DATASTORE string
 var HASHLIST string
 var BLOOMFILTER string
 var LOGFILE string
@@ -17,48 +18,39 @@ var LOGFILE string
 func buildEnv() {
 	env.Load(".env")
 	WD = os.Getenv("WORKING_DIRECTORY")
+	DATASTORE = os.Getenv("DATASTORE")
 	HASHLIST = os.Getenv("HASH_LIST")
 	BLOOMFILTER = os.Getenv("BLOOM_FILTER")
 	LOGFILE = os.Getenv("LOGFILE")
 	persist.WD = WD
-}
+	persist.DATASTORE = DATASTORE
+	logging.LOGFILE = LOGFILE
 
-func setupLogger() {
-	log.SetFormatter(&log.JSONFormatter{})
-	log.SetLevel(log.WarnLevel)
-	logFile, err := os.OpenFile(LOGFILE, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
-	if err != nil {
-		panic("Unable to open mailer logfile")
+	//if the working directory does not exist, then create it.
+	if _, err := os.Stat(WD); os.IsNotExist(err) {
+		os.MkdirAll(WD, os.ModePerm)
+		os.MkdirAll(DATASTORE, os.ModePerm)
 	}
-	log.SetOutput(logFile)
+
+	fmt.Println("Working Directory:", WD)
 }
 
 func main() {
 	buildEnv()
-	fmt.Println("Working Directory:", WD)
-
-	//if the working directory does not exist, then create it.
-	if _, err := os.Stat(WD); os.IsNotExist(err) {
-		os.Mkdir(WD, os.ModePerm)
-	}
+	logging.Initialize()
 
 	// curently this just generates a hashlist for testing purposes.
+	hl := new([][32]byte)
 	hashes := hash.GenerateHashList("testfile")
 
 	//build the persistent read write channels.
-	readChan, readResponseChan, writeChan, writeResponseChan := persist.PersistentChannels()
-	hashStore := persist.NewFOB(HASHLIST)
-
+	hashStore := persist.NewFOB(HASHLIST, hl)
 	hashStore.Object = hashes
 
-	// send in the persistent Store request
-	writeChan <- hashStore
-	// wait for and remove the response
-	<-writeResponseChan
-	test := persist.NewFOB(HASHLIST)
+	// persistently write and ensure file is on drive
+	hashStore.WriteBlocking()
 
-	// send in the read request
-	readChan <- test
-	//block for response
-	<-readResponseChan
+	test := persist.NewFOB(HASHLIST, hl)
+	test.ReadBlocking()
+	fmt.Println("FOB:", test.Object.(*[][32]byte))
 }
