@@ -14,6 +14,7 @@ import (
 
 // TODO this is really inefficient as it requires the entire file to be loaded in memory
 // It is likey that this shoul dbe a worker on the channel producing the files
+
 func send(hash string, data []byte) {
 	// adapted from https://gist.github.com/mattetti/5914158/f4d1393d83ebedc682a3c8e7bdc6b49670083b84
 	body := new(bytes.Buffer)
@@ -28,7 +29,7 @@ func send(hash string, data []byte) {
 	err = writer.Close()
 	logging.PanicOnError("Error Closing Multipart Writer", err)
 
-	req, err := http.NewRequest("POST", "http://Localhost:"+env.RESTPORT+"/deposit", body)
+	req, err := http.NewRequest("POST", "http://"+env.SERVER_URL+":"+env.RESTPORT+"/deposit", body)
 	req.Header.Add("Content-Type", writer.FormDataContentType())
 	logging.PanicOnError("Error creating HTTP request", err)
 	client := &http.Client{}
@@ -42,7 +43,7 @@ func send(hash string, data []byte) {
 }
 
 func check(hash string) bool {
-	response, err := http.Get("http://localhost:" + env.RESTPORT + "/check?hash=" + hash)
+	response, err := http.Get("http://" + env.SERVER_URL + ":" + env.RESTPORT + "/check?hash=" + hash)
 	logging.PanicOnError("Get Request to checker", err)
 	defer response.Body.Close()
 	contents, err := ioutil.ReadAll(response.Body)

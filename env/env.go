@@ -15,6 +15,7 @@ var HASHLIST string
 var BLOOMFILTER string
 var LOGFILE string
 var RESTPORT string
+var SERVER_URL string
 
 func BuildEnv() {
 	e.Load(".env")
@@ -24,6 +25,7 @@ func BuildEnv() {
 	BLOOMFILTER = os.Getenv("BLOOM_FILTER")
 	LOGFILE = os.Getenv("LOGFILE")
 	RESTPORT = os.Getenv("RESTPORT")
+	SERVER_URL = os.Getenv("SERVER_URL")
 	persist.WD = WD
 	logging.LOGFILE = LOGFILE
 
