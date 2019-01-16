@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"runtime"
 	"sync"
@@ -122,9 +123,16 @@ func GenerateHashList(fileName string) chan *FilePart {
 
 		close(dataChannel)
 		wg.Wait()
-		close(HashChannel)
+		// close(HashChannel)
 	}()
 
 	// fmt.Println("Results: ", results)
 	return output
+}
+
+func HashFile(fileName string) string {
+	f, _ := os.Open(fileName)
+	d, _ := ioutil.ReadAll(f)
+	fmt.Println("FileHash:", sha2Block(d))
+	return sha2Block(d)
 }

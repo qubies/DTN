@@ -68,7 +68,6 @@ func main() {
 		} else {
 			fmt.Println("Hash:", x.Hash)
 		}
-		fmt.Println("run")
 	}
 
 	//build the persistent read write channels.
