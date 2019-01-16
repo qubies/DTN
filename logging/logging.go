@@ -1,7 +1,6 @@
 package logging
 
 import (
-	"fmt"
 	log "github.com/sirupsen/logrus"
 	"os"
 	"time"
@@ -46,8 +45,4 @@ func PanicObjectError(object interface{}, task string, err error) {
 		}).Error(task)
 		panic(task)
 	}
-}
-
-func main() {
-	fmt.Println("vim-go")
 }

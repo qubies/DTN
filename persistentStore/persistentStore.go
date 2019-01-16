@@ -125,5 +125,4 @@ func ReadBytes(fileName string) ([]byte, error) {
 		return nil, errors.New("File Did Not Exist")
 	}
 	return ioutil.ReadFile(fileName)
-
 }
