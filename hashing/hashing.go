@@ -29,23 +29,27 @@ func workChan(input <-chan (*OrderedReturn), output chan<- (*OrderedReturn), wg 
 	wg.Done()
 }
 
-func consumer(input chan (*OrderedReturn), wg *sync.WaitGroup) [][32]byte {
+func consumer(input chan (*OrderedReturn), wg *sync.WaitGroup) ([][32]byte, map[[32]byte][]byte) {
 	results := make(map[int][32]byte)
+	fileBlocks := make(map[[32]byte][]byte)
 	for OR := range input {
 		results[OR.index] = OR.hash
+		fileBlocks[OR.hash] = OR.bytes
 	}
 
 	rVal := make([][32]byte, len(results))
 	for k, v := range results {
 		rVal[k] = v
 	}
+
 	defer wg.Done()
-	return rVal
+	return rVal, fileBlocks
 }
 
 //this is the only exported function, it should generate a lsit of hashes.
-func GenerateHashList(fileName string) [][32]byte {
-	var results [][32]byte
+func GenerateHashList(fileName string) ([][32]byte, map[[32]byte][]byte) {
+	var hashList [][32]byte
+	var fileBlocks map[[32]byte][]byte
 	file, err := os.Open(fileName)
 	if err != nil {
 		fmt.Println(err)
@@ -66,7 +70,7 @@ func GenerateHashList(fileName string) [][32]byte {
 
 	index := 0
 
-	go func() { results = consumer(hashChannel, wg2) }()
+	go func() { hashList, fileBlocks = consumer(hashChannel, wg2) }()
 
 	for {
 		OR := new(OrderedReturn)
@@ -85,5 +89,5 @@ func GenerateHashList(fileName string) [][32]byte {
 	wg2.Wait()
 
 	// fmt.Println("Results: ", results)
-	return results
+	return hashList, fileBlocks
 }
