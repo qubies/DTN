@@ -1,35 +1,42 @@
 package main
 
 import (
-	// "bytes"
+	"bytes"
 	"fmt"
 	env "github.com/qubies/DTN/env"
 	hash "github.com/qubies/DTN/hashing"
 	logging "github.com/qubies/DTN/logging"
 	persist "github.com/qubies/DTN/persistentStore"
-	// "mime/multipart"
-	// "net/http"
+	"mime/multipart"
+	"net/http"
 )
 
-// func send(hash [32]byte, data []byte) {
-//     body := new(bytes.Buffer)
-//     writer := multipart.NewWriter(body)
-//     part, err := writer.CreateFormFile(paramName, fi.Name())
-//     if err != nil {
-//         return nil, err
-//     }
-//     part.Write()
+func send(hash string, data []byte) {
+	body := new(bytes.Buffer)
+	writer := multipart.NewWriter(body)
+	part, err := writer.CreateFormFile("file", hash)
+	logging.PanicOnError("Error Creating Multipart Writer", err)
+	part.Write(data)
 
-//     for key, val := range params {
-//         _ = writer.WriteField(key, val)
-//     }
-//     err = writer.Close()
-//     if err != nil {
-//         return nil, err
-//     }
+	// I think this can be removed later.
+	writer.WriteField("name", hash)
 
-//     return http.NewRequest("POST", uri, body)
-// }
+	err = writer.Close()
+	logging.PanicOnError("Error Closing Multipart Writer", err)
+
+	req, err := http.NewRequest("POST", "http://Localhost:"+env.RESTPORT+"/deposit", body)
+	req.Header.Add("Content-Type", writer.FormDataContentType())
+	logging.PanicOnError("Error creating HTTP request", err)
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	logging.PanicOnError("Error sending HTTP request", err)
+	var bodyContent []byte
+	fmt.Println(resp.StatusCode)
+	fmt.Println(resp.Header)
+	resp.Body.Read(bodyContent)
+	resp.Body.Close()
+	fmt.Println(bodyContent)
+}
 
 func main() {
 	env.BuildEnv()
@@ -37,8 +44,8 @@ func main() {
 
 	// curently this just generates a hashlist for testing purposes.
 	hl := new([]string)
-	// hashes, fileBlock := hash.GenerateHashList("testfile")
-	hashes, _ := hash.GenerateHashList("testfile")
+	hashes, fileBlock := hash.GenerateHashList("testfile")
+	// hashes, _ := hash.GenerateHashList("testfile")
 
 	//build the persistent read write channels.
 	hashStore := persist.NewFOB(env.HASHLIST, hl)
@@ -52,5 +59,8 @@ func main() {
 	hashList := test.Object.(*[]string)
 	for _, hash := range *hashList {
 		fmt.Println("Hash:", hash)
+	}
+	for k, v := range fileBlock {
+		send(k, v)
 	}
 }
