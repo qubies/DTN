@@ -7,6 +7,7 @@ import (
 	hash "github.com/qubies/DTN/hashing"
 	logging "github.com/qubies/DTN/logging"
 	persist "github.com/qubies/DTN/persistentStore"
+	"io/ioutil"
 	"mime/multipart"
 	"net/http"
 )
@@ -40,6 +41,16 @@ func send(hash string, data []byte) {
 	resp.Body.Close()
 }
 
+func check(hash string) bool {
+	response, err := http.Get("http://localhost:" + env.RESTPORT + "/check?hash=" + hash)
+	logging.PanicOnError("Get Request to checker", err)
+	defer response.Body.Close()
+	contents, err := ioutil.ReadAll(response.Body)
+	logging.PanicOnError("reading get request body from checker", err)
+	fmt.Println("Received:", string(contents))
+	return string(contents) == "SEND"
+}
+
 func main() {
 	env.BuildEnv()
 	logging.Initialize()
@@ -50,8 +61,13 @@ func main() {
 	var hashList []string
 	for x := range partChan {
 		hashList = append(hashList, x.Hash)
-		send(x.Hash, x.Bytes)
-		fmt.Println("Hash:", x.Hash)
+		if check(x.Hash) {
+			send(x.Hash, x.Bytes)
+			fmt.Println("Sent Hash:", x.Hash)
+		} else {
+			fmt.Println("Hash:", x.Hash)
+		}
+		fmt.Println("run")
 	}
 
 	//build the persistent read write channels.
