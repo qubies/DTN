@@ -2,12 +2,13 @@ package persistentStore
 
 import (
 	"encoding/gob"
-	logging "github.com/qubies/DTN/logging"
-	// log "github.com/sirupsen/logrus"
 	"errors"
+	logging "github.com/qubies/DTN/logging"
 	"io/ioutil"
 	"os"
 )
+
+var WD string
 
 // FileObject is a convenience wrapper to a persistent store object.
 type FileObject struct {
@@ -16,8 +17,6 @@ type FileObject struct {
 	Complete_Chan chan bool
 }
 
-var WD string
-var DATASTORE string
 var writeChan chan *FileObject
 var readChan chan *FileObject
 

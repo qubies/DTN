@@ -2,48 +2,16 @@ package main
 
 import (
 	"fmt"
-	env "github.com/joho/godotenv"
+	"github.com/gin-gonic/gin"
+	env "github.com/qubies/DTN/env"
 	hash "github.com/qubies/DTN/hashing"
 	logging "github.com/qubies/DTN/logging"
 	persist "github.com/qubies/DTN/persistentStore"
-	"os"
-
 	"net/http"
 	"path/filepath"
-
-	"github.com/gin-gonic/gin"
 )
 
-//.env consts
-var WD string
-var DATASTORE string
-var HASHLIST string
-var BLOOMFILTER string
-var LOGFILE string
-var RESTPORT string
-
 const MEMORYLIMIT = 200
-
-func buildEnv() {
-	env.Load(".env")
-	WD = os.Getenv("WORKING_DIRECTORY")
-	DATASTORE = os.Getenv("DATASTORE")
-	HASHLIST = os.Getenv("HASH_LIST")
-	BLOOMFILTER = os.Getenv("BLOOM_FILTER")
-	LOGFILE = os.Getenv("LOGFILE")
-	RESTPORT = os.Getenv("RESTPORT")
-	persist.WD = WD
-	persist.DATASTORE = DATASTORE
-	logging.LOGFILE = LOGFILE
-
-	//if the working directory does not exist, then create it.
-	if _, err := os.Stat(WD); os.IsNotExist(err) {
-		os.MkdirAll(WD, os.ModePerm)
-		os.MkdirAll(DATASTORE, os.ModePerm)
-	}
-
-	fmt.Println("Working Directory:", WD)
-}
 
 func runServer() {
 	// adapted from the gin docs example
@@ -61,7 +29,7 @@ func runServer() {
 			c.String(http.StatusBadRequest, fmt.Sprintf("get form err: %s", err.Error()))
 			return
 		}
-		filename := filepath.Join(DATASTORE, file.Filename)
+		filename := filepath.Join(env.DATASTORE, file.Filename)
 		if err := c.SaveUploadedFile(file, filename); err != nil {
 			c.String(http.StatusBadRequest, fmt.Sprintf("upload file err: %s", err.Error()))
 			return
@@ -69,25 +37,26 @@ func runServer() {
 
 		c.String(http.StatusOK, fmt.Sprintf("File %s uploaded successfully with fields name=%s ", file.Filename, fileName))
 	})
-	router.Run(":" + RESTPORT)
+	router.Run(":" + env.RESTPORT)
 }
 
 func main() {
-	buildEnv()
+	env.BuildEnv()
 	logging.Initialize()
 
 	// curently this just generates a hashlist for testing purposes.
 	hl := new([][32]byte)
-	hashes := hash.GenerateHashList("testfile")
+	// hashes, fileBlock := hash.GenerateHashList("testfile")
+	hashes, _ := hash.GenerateHashList("testfile")
 
 	//build the persistent read write channels.
-	hashStore := persist.NewFOB(HASHLIST, hl)
+	hashStore := persist.NewFOB(env.HASHLIST, hl)
 	hashStore.Object = hashes
 
 	// persistently write and ensure file is on drive
 	hashStore.WriteBlocking()
 
-	test := persist.NewFOB(HASHLIST, hl)
+	test := persist.NewFOB(env.HASHLIST, hl)
 	test.ReadBlocking()
 	fmt.Println("FOB:", test.Object.(*[][32]byte))
 	runServer()

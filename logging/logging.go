@@ -6,9 +6,9 @@ import (
 	"time"
 )
 
-const LOGLEVEL = log.InfoLevel
-
 var LOGFILE string
+
+const LOGLEVEL = log.InfoLevel
 
 func logStart() {
 	log.WithFields(log.Fields{
