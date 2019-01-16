@@ -6,29 +6,18 @@ import (
 	env "github.com/qubies/DTN/env"
 	//	hash "github.com/qubies/DTN/hashing"
 	logging "github.com/qubies/DTN/logging"
+	persist "github.com/qubies/DTN/persistentStore"
 	//	persist "github.com/qubies/DTN/persistentStore"
 	"net/http"
 	"os"
 	"path/filepath"
 )
 
-const MEMORYLIMIT = 200
-
 func uploadPost(c *gin.Context) {
-	fileName := c.PostForm("name")
-	file, err := c.FormFile("file")
-
-	if err != nil {
-		c.String(http.StatusBadRequest, fmt.Sprintf("get form err: %s", err.Error()))
-		return
-	}
-	filename := filepath.Join(env.DATASTORE, file.Filename)
-	if err := c.SaveUploadedFile(file, filename); err != nil {
-		c.String(http.StatusBadRequest, fmt.Sprintf("upload file err: %s", err.Error()))
-		return
-	}
-
-	c.String(http.StatusOK, fmt.Sprintf("File %s uploaded successfully with fields name=%s ", file.Filename, fileName))
+	fileName, _ := c.GetQuery("hash")
+	data, _ := c.GetRawData()
+	persist.WriteBytes(filepath.Join(env.DATASTORE, fileName), data)
+	c.String(200, "ok")
 }
 
 func checkHash(c *gin.Context) {
@@ -44,10 +33,8 @@ func checkHash(c *gin.Context) {
 func runServer() {
 	// adapted from the gin docs example
 	//initialize the api
-	// router := gin.New()
 	router := gin.Default()
-	// Set a lower memory limit for multipart forms (default is 32 MiB)
-	router.MaxMultipartMemory = MEMORYLIMIT << 20 // MEMORYLIMIT MiB
+
 	router.POST("/deposit", uploadPost)
 	router.GET("/check", checkHash)
 	router.Run(":" + env.RESTPORT)

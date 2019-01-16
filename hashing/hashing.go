@@ -1,7 +1,7 @@
 package Hashing
 
 import (
-	"crypto/sha256"
+	hashFunc "crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -18,9 +18,10 @@ var NUM_WORKERS int = runtime.GOMAXPROCS(0)
 
 var BUFFERSIZE int = NUM_WORKERS + 1 // add some space for the gatherer
 
-func sha2Block(info []byte) string {
-	raw := sha256.Sum256(info)
-	return hex.EncodeToString(raw[:])
+func hashBlock(info []byte) string {
+	h := hashFunc.New()
+	h.Write(info)
+	return hex.EncodeToString(h.Sum(nil))
 }
 
 type FilePart struct {
@@ -49,9 +50,10 @@ func (I *indexCount) get() int {
 
 func workChan(input <-chan (*FilePart), output chan<- (*FilePart), wg *sync.WaitGroup, ic *indexCount) {
 	for local := range input {
-		local.Hash = sha2Block(local.Bytes)
-		for local.Index >= ic.get()+BUFFERSIZE {
-			time.Sleep(time.Millisecond * 10)
+		local.Hash = hashBlock(local.Bytes)
+		for local.Index >= ic.get()+BUFFERSIZE-1 {
+			// fmt.Println("blocked")
+			time.Sleep(time.Millisecond * 1)
 		}
 		output <- local
 	}
@@ -63,7 +65,7 @@ func gatherer(input chan (*FilePart), indexChan chan int, ic *indexCount) chan *
 	go func() {
 
 		cVal := 0
-		index := 9999999
+		index := 999999999999
 		for cVal < index {
 			select {
 			case OR := <-input:
@@ -123,16 +125,13 @@ func GenerateHashList(fileName string) chan *FilePart {
 
 		close(dataChannel)
 		wg.Wait()
-		// close(HashChannel)
 	}()
-
-	// fmt.Println("Results: ", results)
 	return output
 }
 
 func HashFile(fileName string) string {
 	f, _ := os.Open(fileName)
 	d, _ := ioutil.ReadAll(f)
-	fmt.Println("FileHash:", sha2Block(d))
-	return sha2Block(d)
+	fmt.Println("FileHash:", hashBlock(d))
+	return hashBlock(d)
 }
