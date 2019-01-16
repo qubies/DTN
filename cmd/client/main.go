@@ -11,7 +11,10 @@ import (
 	"net/http"
 )
 
+// TODO this is really inefficient as it requires the entire file to be loaded in memory
+// It is likey that this shoul dbe a worker on the channel producing the files
 func send(hash string, data []byte) {
+	// adapted from https://gist.github.com/mattetti/5914158/f4d1393d83ebedc682a3c8e7bdc6b49670083b84
 	body := new(bytes.Buffer)
 	writer := multipart.NewWriter(body)
 	part, err := writer.CreateFormFile("file", hash)
@@ -31,11 +34,10 @@ func send(hash string, data []byte) {
 	resp, err := client.Do(req)
 	logging.PanicOnError("Error sending HTTP request", err)
 	var bodyContent []byte
-	fmt.Println(resp.StatusCode)
-	fmt.Println(resp.Header)
+	// fmt.Println(resp.StatusCode)
+	// fmt.Println(resp.Header)
 	resp.Body.Read(bodyContent)
 	resp.Body.Close()
-	fmt.Println(bodyContent)
 }
 
 func main() {
@@ -44,23 +46,21 @@ func main() {
 
 	// curently this just generates a hashlist for testing purposes.
 	hl := new([]string)
-	hashes, fileBlock := hash.GenerateHashList("testfile")
-	// hashes, _ := hash.GenerateHashList("testfile")
+	partChan := hash.GenerateHashList("testfile")
+	var hashList []string
+	for x := range partChan {
+		hashList = append(hashList, x.Hash)
+		send(x.Hash, x.Bytes)
+		fmt.Println("Hash:", x.Hash)
+	}
 
 	//build the persistent read write channels.
 	hashStore := persist.NewFOB(env.HASHLIST, hl)
-	hashStore.Object = hashes
+	hashStore.Object = hashList
 
 	// persistently write and ensure file is on drive
 	hashStore.WriteBlocking()
 
 	test := persist.NewFOB(env.HASHLIST, hl)
 	test.ReadBlocking()
-	hashList := test.Object.(*[]string)
-	for _, hash := range *hashList {
-		fmt.Println("Hash:", hash)
-	}
-	for k, v := range fileBlock {
-		send(k, v)
-	}
 }
