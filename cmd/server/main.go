@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	env "github.com/qubies/DTN/env"
-	hash "github.com/qubies/DTN/hashing"
+	//	hash "github.com/qubies/DTN/hashing"
 	logging "github.com/qubies/DTN/logging"
-	persist "github.com/qubies/DTN/persistentStore"
+	//	persist "github.com/qubies/DTN/persistentStore"
 	"net/http"
 	"path/filepath"
 )
@@ -39,25 +39,12 @@ func runServer() {
 	})
 	router.Run(":" + env.RESTPORT)
 }
-
-func main() {
+func startup() {
 	env.BuildEnv()
 	logging.Initialize()
+}
 
-	// curently this just generates a hashlist for testing purposes.
-	hl := new([][32]byte)
-	// hashes, fileBlock := hash.GenerateHashList("testfile")
-	hashes, _ := hash.GenerateHashList("testfile")
-
-	//build the persistent read write channels.
-	hashStore := persist.NewFOB(env.HASHLIST, hl)
-	hashStore.Object = hashes
-
-	// persistently write and ensure file is on drive
-	hashStore.WriteBlocking()
-
-	test := persist.NewFOB(env.HASHLIST, hl)
-	test.ReadBlocking()
-	fmt.Println("FOB:", test.Object.(*[][32]byte))
+func main() {
+	startup()
 	runServer()
 }

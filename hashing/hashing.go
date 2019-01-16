@@ -2,6 +2,7 @@ package Hashing
 
 import (
 	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
@@ -11,14 +12,15 @@ import (
 const BLOCKSIZE int = 100 * 1000000
 const NUM_WORKERS int = 8
 
-func sha2Block(info []byte) [32]byte {
-	return sha256.Sum256(info)
+func sha2Block(info []byte) string {
+	raw := sha256.Sum256(info)
+	return hex.EncodeToString(raw[:])
 }
 
 type OrderedReturn struct {
 	index int
 	bytes []byte
-	hash  [32]byte
+	hash  string
 }
 
 func workChan(input <-chan (*OrderedReturn), output chan<- (*OrderedReturn), wg *sync.WaitGroup) {
@@ -29,15 +31,15 @@ func workChan(input <-chan (*OrderedReturn), output chan<- (*OrderedReturn), wg 
 	wg.Done()
 }
 
-func consumer(input chan (*OrderedReturn), wg *sync.WaitGroup) ([][32]byte, map[[32]byte][]byte) {
-	results := make(map[int][32]byte)
-	fileBlocks := make(map[[32]byte][]byte)
+func consumer(input chan (*OrderedReturn), wg *sync.WaitGroup) ([]string, map[string][]byte) {
+	results := make(map[int]string)
+	fileBlocks := make(map[string][]byte)
 	for OR := range input {
 		results[OR.index] = OR.hash
 		fileBlocks[OR.hash] = OR.bytes
 	}
 
-	rVal := make([][32]byte, len(results))
+	rVal := make([]string, len(results))
 	for k, v := range results {
 		rVal[k] = v
 	}
@@ -47,9 +49,9 @@ func consumer(input chan (*OrderedReturn), wg *sync.WaitGroup) ([][32]byte, map[
 }
 
 //this is the only exported function, it should generate a lsit of hashes.
-func GenerateHashList(fileName string) ([][32]byte, map[[32]byte][]byte) {
-	var hashList [][32]byte
-	var fileBlocks map[[32]byte][]byte
+func GenerateHashList(fileName string) ([]string, map[string][]byte) {
+	var hashList []string
+	var fileBlocks map[string][]byte
 	file, err := os.Open(fileName)
 	if err != nil {
 		fmt.Println(err)
