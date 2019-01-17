@@ -12,7 +12,7 @@ import (
 	"sync"
 )
 
-const num_senders = 5
+const num_senders = 10
 
 func send(hash string, data []byte) {
 	resp, err := http.Post("http://"+env.SERVER_URL+":"+env.RESTPORT+"/deposit?hash="+hash, "binary/octet-stream", bytes.NewReader(data))

@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-const BLOCKSIZE int = 100 * 1000000
+const BLOCKSIZE int = 1 * 1000000
 
 var NUM_WORKERS int = runtime.GOMAXPROCS(0)
 
