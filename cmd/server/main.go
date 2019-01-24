@@ -7,7 +7,6 @@ import (
 	//	hash "github.com/qubies/DTN/hashing"
 	logging "github.com/qubies/DTN/logging"
 	persist "github.com/qubies/DTN/persistentStore"
-	//	persist "github.com/qubies/DTN/persistentStore"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -16,8 +15,18 @@ import (
 func uploadPost(c *gin.Context) {
 	fileName, _ := c.GetQuery("hash")
 	data, _ := c.GetRawData()
+	// fmt.Println(fileName, data)
 	persist.WriteBytes(filepath.Join(env.DATASTORE, fileName), data)
 	c.String(200, "ok")
+}
+
+func uploadList(c *gin.Context) {
+	fileName, _ := c.GetQuery("fileName")
+	hashList, _ := c.GetRawData()
+	// fmt.Println(fileName, data)
+	persist.WriteBytes(filepath.Join(env.HASHLIST, fileName), hashList)
+	c.String(200, "ok")
+
 }
 
 func checkHash(c *gin.Context) {
@@ -34,9 +43,11 @@ func runServer() {
 	// adapted from the gin docs example
 	//initialize the api
 	router := gin.Default()
+	// router := gin.New()
 
 	router.POST("/deposit", uploadPost)
 	router.GET("/check", checkHash)
+	router.POST("/hashlist", uploadList)
 	router.Run(":" + env.RESTPORT)
 }
 func startup() {

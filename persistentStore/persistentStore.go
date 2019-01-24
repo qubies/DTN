@@ -6,6 +6,7 @@ import (
 	logging "github.com/qubies/DTN/logging"
 	"io/ioutil"
 	"os"
+	// "time"
 )
 
 var WD string
@@ -30,7 +31,7 @@ func writeFob(fob *FileObject) {
 	fobErr(fob, "Error creating temp file for object in writeFob", err)
 
 	encoder := gob.NewEncoder(tmp)
-	err = encoder.Encode(fob.Object)
+	err = encoder.Encode(&fob.Object)
 	fobErr(fob, "Error encoding temp file for object in writeFob", err)
 	// not sure if nexessary for this project, This will slow down IO as the File buffers actually get flushed to disk.
 	// The advantage is that once sync returns, the file is on the disk.
@@ -46,7 +47,7 @@ func readFob(fob *FileObject) {
 	defer file.Close()
 
 	decoder := gob.NewDecoder(file)
-	err = decoder.Decode(fob.Object)
+	err = decoder.Decode(&fob.Object)
 	fobErr(fob, "Error decoding file for object in readFob", err)
 }
 
@@ -113,7 +114,8 @@ func WriteBytes(fileName string, data []byte) {
 		defer file.Close()
 		_, err = file.Write(data)
 		logging.PanicObjectError(file, "Writing to new data file", err)
-		file.Sync()
+		// file.Sync()
+		// time.Sleep(time.Second)
 	} else {
 		logging.DuplicateFileWrite(fileName)
 	}

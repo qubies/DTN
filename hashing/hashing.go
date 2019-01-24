@@ -4,17 +4,20 @@ import (
 	hashFunc "crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"gopkg.in/cheggaaa/pb.v1"
 	"io"
 	"io/ioutil"
 	"os"
 	"runtime"
 	"sync"
-	"time"
 )
 
-const BLOCKSIZE int = 1 * 1000000
+var BLOCK int
+var BLOCKSIZE int
 
 var NUM_WORKERS int = runtime.GOMAXPROCS(0)
+
+// var NUM_WORKERS int = 1
 
 var BUFFERSIZE int = NUM_WORKERS + 1 // add some space for the gatherer
 
@@ -30,66 +33,18 @@ type FilePart struct {
 	Hash  string
 }
 
-type indexCount struct {
-	sync.RWMutex
-	val int
-}
-
-// The index count prevents the workers from filling the buffer poorly and also from overstuffing it.
-func (I *indexCount) incr() {
-	I.Lock()
-	defer I.Unlock()
-	I.val++
-}
-
-func (I *indexCount) get() int {
-	I.RLock()
-	defer I.RUnlock()
-	return I.val
-}
-
-func workChan(input <-chan (*FilePart), output chan<- (*FilePart), wg *sync.WaitGroup, ic *indexCount) {
+func workChan(input <-chan (*FilePart), output chan<- (*FilePart), wg *sync.WaitGroup) {
 	for local := range input {
 		local.Hash = hashBlock(local.Bytes)
-		for local.Index >= ic.get()+BUFFERSIZE-1 {
-			// fmt.Println("blocked")
-			time.Sleep(time.Millisecond * 1)
-		}
 		output <- local
 	}
 	wg.Done()
 }
 
-func gatherer(input chan (*FilePart), indexChan chan int, ic *indexCount) chan *FilePart {
-	output := make(chan *FilePart, BUFFERSIZE)
-	go func() {
-
-		cVal := 0
-		index := 999999999999
-		for cVal < index {
-			select {
-			case OR := <-input:
-				if OR.Index != cVal {
-					input <- OR
-				} else {
-					cVal++
-					output <- OR
-					ic.incr()
-				}
-			case index = <-indexChan:
-				{
-				}
-			}
-		}
-
-		defer close(output)
-	}()
-	return output
-}
-
 //this is the only exported function, it should generate a lsit of Hashes.
 func GenerateHashList(fileName string) chan *FilePart {
-	fmt.Println("Workers:", NUM_WORKERS)
+	fmt.Println("Workers On Hash Pipeline:", NUM_WORKERS)
+	fmt.Println("Blocksize:", BLOCKSIZE/1000, "kB")
 	file, err := os.Open(fileName)
 	if err != nil {
 		fmt.Println(err)
@@ -97,36 +52,43 @@ func GenerateHashList(fileName string) chan *FilePart {
 	}
 
 	dataChannel := make(chan *FilePart, NUM_WORKERS)
-	HashChannel := make(chan *FilePart, NUM_WORKERS)
-	indexChannel := make(chan int)
+	hashChannel := make(chan *FilePart, NUM_WORKERS)
 
 	wg := new(sync.WaitGroup)
 	wg.Add(NUM_WORKERS)
-	ic := new(indexCount)
 	for i := 0; i < NUM_WORKERS; i++ {
-		go workChan(dataChannel, HashChannel, wg, ic)
+		go workChan(dataChannel, hashChannel, wg)
+	}
+	Index := 0
+	fileInfo, err := file.Stat()
+	if err != nil {
+		// Could not obtain stat, handle error
 	}
 
-	Index := 0
-	output := gatherer(HashChannel, indexChannel, ic)
-
+	bar := pb.StartNew(int(fileInfo.Size() / int64(BLOCKSIZE)))
 	go func() {
 		for {
 			OR := new(FilePart)
 			OR.Index = Index
 			OR.Bytes = make([]byte, BLOCKSIZE)
-			if _, err := file.Read(OR.Bytes); err == io.EOF {
+			bytesRead, err := file.Read(OR.Bytes)
+			if err == io.EOF {
 				break
 			}
+			if bytesRead != BLOCKSIZE {
+				OR.Bytes = append([]byte(nil), OR.Bytes[:bytesRead]...)
+			}
 			dataChannel <- OR
+			bar.Increment()
 			Index++
 		}
-		indexChannel <- Index
 
 		close(dataChannel)
 		wg.Wait()
+		close(hashChannel)
+		bar.FinishPrint("The End!")
 	}()
-	return output
+	return hashChannel
 }
 
 func HashFile(fileName string) string {
