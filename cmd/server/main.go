@@ -3,7 +3,6 @@ package main
 import (
 	"github.com/gin-gonic/gin"
 	env "github.com/qubies/DTN/env"
-	//	hash "github.com/qubies/DTN/hashing"
 	logging "github.com/qubies/DTN/logging"
 	persist "github.com/qubies/DTN/persistentStore"
 	"net/http"

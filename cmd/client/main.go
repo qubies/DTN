@@ -45,52 +45,55 @@ func sendHashList(fileName string, data *bytes.Buffer) bool {
 }
 
 func main() {
-	fileName := input.GetFile()
+	fileName, op := input.CollectOptions()
 	env.BuildEnv()
 	logging.Initialize()
 
-	// curently this just generates a hashlist for testing purposes.
-	fmt.Println("Workers On Sending Pipeline:", num_senders)
-	partChan := hash.GenerateHashList(fileName)
-	var wg sync.WaitGroup
+	if op == 'u' {
 
-	wg.Add(num_senders) //number of senders (warning that this will unplug the pipeline to a degree and use more memory)
-	maxIndex := 0
+		// curently this just generates a hashlist for testing purposes.
+		fmt.Println("Workers On Sending Pipeline:", num_senders)
+		partChan := hash.GenerateHashList(fileName)
+		var wg sync.WaitGroup
 
-	var hashList sync.Map
-	var uniqueHash sync.Map
-	for x := 0; x < num_senders; x++ {
-		go func() {
-			for x := range partChan {
-				if x.Index > maxIndex {
-					maxIndex = x.Index
-				}
-				hashList.Store(x.Index, x.Hash)
-				_, ok := uniqueHash.LoadOrStore(x.Hash, true)
-				if !ok {
+		wg.Add(num_senders) //number of senders (warning that this will unplug the pipeline to a degree and use more memory)
+		maxIndex := 0
 
-					if check(x.Hash) {
-						send(x.Hash, x.Bytes)
+		var hashList sync.Map
+		var uniqueHash sync.Map
+		for x := 0; x < num_senders; x++ {
+			go func() {
+				for x := range partChan {
+					if x.Index > maxIndex {
+						maxIndex = x.Index
+					}
+					hashList.Store(x.Index, x.Hash)
+					_, ok := uniqueHash.LoadOrStore(x.Hash, true)
+					if !ok {
+
+						if check(x.Hash) {
+							send(x.Hash, x.Bytes)
+						}
 					}
 				}
-			}
-			wg.Done()
-		}()
-	}
-	wg.Wait()
+				wg.Done()
+			}()
+		}
+		wg.Wait()
 
-	finalList := make([]string, maxIndex+1)
-	hashList.Range(func(key, value interface{}) bool {
-		finalList[key.(int)] = value.(string)
-		return true
-	})
-	var listStore bytes.Buffer
-	enc := gob.NewEncoder(&listStore)
-	enc.Encode(finalList)
-	if sendHashList(fileName, &listStore) {
-		fmt.Println("File Stored")
+		finalList := make([]string, maxIndex+1)
+		hashList.Range(func(key, value interface{}) bool {
+			finalList[key.(int)] = value.(string)
+			return true
+		})
+		var listStore bytes.Buffer
+		enc := gob.NewEncoder(&listStore)
+		enc.Encode(finalList)
+		if sendHashList(fileName, &listStore) {
+			fmt.Println("File Stored")
+		}
+	} else if op == 'd' {
+		//recreate the file for a test to ./rebuilt.
+		hash.Rebuild(filepath.Join(env.HASHLIST, fileName), env.DATASTORE, "./rebuilt")
 	}
-
-	//recreate the file for a test to ./rebuilt.
-	hash.Rebuild(filepath.Join(env.HASHLIST, fileName), env.DATASTORE, "./rebuilt")
 }
