@@ -11,7 +11,7 @@ import (
 	// hashing "github.com/qubies/DTN/hashing"
 	input "github.com/qubies/DTN/input"
 	logging "github.com/qubies/DTN/logging"
-	// persist "github.com/qubies/DTN/persistentStore"
+	persist "github.com/qubies/DTN/persistentStore"
 	"io/ioutil"
 	"net/http"
 	"path/filepath"
@@ -42,6 +42,25 @@ func sendHashList(fileName string, data *bytes.Buffer) bool {
 	resp, err := http.Post("http://"+env.SERVER_URL+":"+env.RESTPORT+"/hashlist?fileName="+fileName, "binary/octet-stream", bytes.NewReader(data.Bytes()))
 	logging.PanicOnError("Get Request to checker", err)
 	return readResponse(resp) == "ok"
+}
+func getHashList(fileName string) *[]string {
+	response, err := http.Get("http://" + env.SERVER_URL + ":" + env.RESTPORT + "/getList?fileName=" + fileName)
+	logging.PanicOnError("Get Request Hash List", err)
+	hashList := new([]string)
+	dec := gob.NewDecoder(response.Body)
+	dec.Decode(hashList)
+	response.Body.Close()
+	return hashList
+}
+
+func getHash(hash string) *[]byte {
+	response, err := http.Get("http://" + env.SERVER_URL + ":" + env.RESTPORT + "/getData?hash=" + hash)
+	logging.PanicOnError("Get Request Hash", err)
+	b, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		panic(err)
+	}
+	return &b
 }
 
 func main() {
@@ -94,6 +113,12 @@ func main() {
 		}
 	} else if op == 'd' {
 		//recreate the file for a test to ./rebuilt.
-		hash.Rebuild(filepath.Join(env.HASHLIST, fileName), env.DATASTORE, "./rebuilt")
+		hashList := getHashList(fileName)
+		for _, x := range *hashList {
+			d := getHash(x)
+			persist.WriteBytes(filepath.Join(env.DATASTORE, x), *d)
+		}
+		fmt.Println(hashList)
+		hash.Rebuild(hashList, env.DATASTORE, fileName+".rebuilt")
 	}
 }
