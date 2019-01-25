@@ -1,6 +1,7 @@
 package logging
 
 import (
+	"fmt"
 	log "github.com/sirupsen/logrus"
 	"os"
 	"time"
@@ -48,8 +49,12 @@ func PanicObjectError(object interface{}, task string, err error) {
 }
 
 func PanicOnError(task string, err error) {
+
 	Error(task, err)
-	panic(err)
+	if err != nil {
+		fmt.Println(task, err)
+		panic(err)
+	}
 }
 
 func Error(task string, err error) {

@@ -54,7 +54,6 @@ func getData(c *gin.Context) {
 
 func checkHash(c *gin.Context) {
 	hash, _ := c.GetQuery("hash")
-	fmt.Println("Checking for Hash:", hash)
 	if _, err := os.Stat(filepath.Join(env.DATASTORE, hash)); os.IsNotExist(err) {
 		c.String(http.StatusOK, "SEND")
 	} else {

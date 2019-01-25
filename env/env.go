@@ -7,6 +7,7 @@ import (
 	logging "github.com/qubies/DTN/logging"
 	persist "github.com/qubies/DTN/persistentStore"
 	"os"
+	"path/filepath"
 	"strconv"
 )
 
@@ -41,6 +42,7 @@ func BuildEnv() {
 		os.MkdirAll(WD, os.ModePerm)
 		os.MkdirAll(DATASTORE, os.ModePerm)
 		os.MkdirAll(HASHLIST, os.ModePerm)
+		os.MkdirAll(filepath.Join(WD, "tmp"), os.ModePerm)
 	}
 	fmt.Println("Working Directory:", WD)
 }
