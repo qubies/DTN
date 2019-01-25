@@ -20,6 +20,7 @@ import (
 )
 
 const num_senders = 100
+const NUM_DOWNLOADERS = 100
 
 func readResponse(response *http.Response) string {
 	defer response.Body.Close()
@@ -62,6 +63,15 @@ func getHash(hash string) *[]byte {
 		panic(err)
 	}
 	return &b
+}
+
+func workDownloads(input chan string, wg *sync.WaitGroup, bar *pb.ProgressBar) {
+	for x := range input {
+		d := getHash(x)
+		persist.WriteBytes(filepath.Join(env.DATASTORE, x), *d)
+		bar.Add(1)
+	}
+	wg.Done()
 }
 
 func main() {
@@ -115,15 +125,22 @@ func main() {
 	} else if op == 'd' {
 		//recreate the file for a test to ./rebuilt.
 		hashList := getHashList(fileName)
+
+		workList := make(chan string, NUM_DOWNLOADERS)
+		var wg sync.WaitGroup
 		bar := pb.StartNew(len(*hashList))
+		for x := 0; x < NUM_DOWNLOADERS; x++ {
+			wg.Add(1)
+			go workDownloads(workList, &wg, bar)
+		}
 		for _, x := range *hashList {
 			wantFile := filepath.Join(env.DATASTORE, x)
 			if !persist.FileExists(wantFile) {
-				d := getHash(x)
-				persist.WriteBytes(wantFile, *d)
+				workList <- x
 			}
-			bar.Add(1)
 		}
+		close(workList)
+		wg.Wait()
 		bar.FinishPrint("Download Complete, rebuilding...")
 		hash.Rebuild(hashList, env.DATASTORE, fileName+".rebuilt")
 	}
