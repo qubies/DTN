@@ -7,11 +7,14 @@ import (
 	"encoding/gob"
 	env "github.com/qubies/DTN/env"
 	hash "github.com/qubies/DTN/hashing"
+	"os"
+	// hashing "github.com/qubies/DTN/hashing"
 	input "github.com/qubies/DTN/input"
 	logging "github.com/qubies/DTN/logging"
 	// persist "github.com/qubies/DTN/persistentStore"
 	"io/ioutil"
 	"net/http"
+	"path/filepath"
 	"sync"
 )
 
@@ -88,8 +91,16 @@ func main() {
 	if sendHashList(fileName, &listStore) {
 		fmt.Println("File Stored")
 	}
+
 	//build the persistent read write channels.
-	// hashStore := persist.NewFOB(env.HASHLIST, finalList)
+	hashFile, _ := os.Open(filepath.Join(env.HASHLIST, fileName))
+	dec := gob.NewDecoder(hashFile)
+	rebuildList := new([]string)
+	dec.Decode(rebuildList)
+	// hashStore := persist.NewFOB(filepath.Join(env.HASHLIST, fileName), rebuildList)
+	// fmt.Println("File:", hashStore.FileName)
+	// hashStore.ReadBlocking()
+	hash.Rebuild(rebuildList, env.DATASTORE, "./rebuilt")
 	// // hashStore.Object = finalList
 
 	// // persistently write and ensure file is on drive

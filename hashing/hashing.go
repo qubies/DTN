@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"runtime"
 	"sync"
 )
@@ -89,6 +90,21 @@ func GenerateHashList(fileName string) chan *FilePart {
 		bar.FinishPrint("The End!")
 	}()
 	return hashChannel
+}
+
+func Rebuild(hashList *[]string, directory string, finalPath string) {
+	output, err := os.Create(finalPath)
+	if err != nil {
+		panic("Error creating file:" + err.Error())
+	}
+	defer output.Close()
+	for _, x := range *hashList {
+		p, err := os.Open(filepath.Join(directory, x))
+		if err != nil {
+			panic("Error opening file:" + err.Error())
+		}
+		io.Copy(output, p)
+	}
 }
 
 func HashFile(fileName string) string {
