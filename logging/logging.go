@@ -48,11 +48,25 @@ func PanicObjectError(object interface{}, task string, err error) {
 }
 
 func PanicOnError(task string, err error) {
+	Error(task, err)
+	panic(err)
+}
+
+func Error(task string, err error) {
 	if err != nil {
 		log.WithFields(log.Fields{
 			"task":  task,
 			"error": err,
 		}).Error(task)
-		panic(err)
+	}
+}
+
+func FileError(task string, filePath string, err error) {
+	if err != nil {
+		log.WithFields(log.Fields{
+			"task":  task,
+			"error": err,
+			"file":  filePath,
+		}).Error(task)
 	}
 }

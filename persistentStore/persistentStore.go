@@ -122,7 +122,7 @@ func WriteBytes(fileName string, data []byte) {
 }
 
 func ReadBytes(fileName string) ([]byte, error) {
-	if _, err := os.Stat(fileName); !os.IsNotExist(err) {
+	if _, err := os.Stat(fileName); os.IsNotExist(err) {
 		return nil, errors.New("File Did Not Exist")
 	}
 	return ioutil.ReadFile(fileName)

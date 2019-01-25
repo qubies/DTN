@@ -71,7 +71,6 @@ func main() {
 
 					if check(x.Hash) {
 						send(x.Hash, x.Bytes)
-						// fmt.Println("Sent Hash:", x.Hash)
 					}
 				}
 			}
