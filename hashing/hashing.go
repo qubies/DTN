@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"gopkg.in/cheggaaa/pb.v1"
+
 	"io"
 	"io/ioutil"
 	"os"
@@ -101,13 +102,16 @@ func Rebuild(hashList *[]string, directory string, finalPath string) {
 		panic("Error creating file:" + err.Error())
 	}
 	defer output.Close()
+	bar := pb.StartNew(len(*hashList))
 	for _, x := range *hashList {
 		p, err := os.Open(filepath.Join(directory, x))
 		if err != nil {
 			panic("Error opening file:" + err.Error())
 		}
 		io.Copy(output, p)
+		bar.Add(1)
 	}
+	bar.FinishPrint("Rebuild Complete!")
 }
 
 func HashFile(fileName string) string {

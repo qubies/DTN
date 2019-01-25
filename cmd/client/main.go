@@ -7,6 +7,7 @@ import (
 	"encoding/gob"
 	env "github.com/qubies/DTN/env"
 	hash "github.com/qubies/DTN/hashing"
+	"gopkg.in/cheggaaa/pb.v1"
 	// "os"
 	// hashing "github.com/qubies/DTN/hashing"
 	input "github.com/qubies/DTN/input"
@@ -114,11 +115,16 @@ func main() {
 	} else if op == 'd' {
 		//recreate the file for a test to ./rebuilt.
 		hashList := getHashList(fileName)
+		bar := pb.StartNew(len(*hashList))
 		for _, x := range *hashList {
-			d := getHash(x)
-			persist.WriteBytes(filepath.Join(env.DATASTORE, x), *d)
+			wantFile := filepath.Join(env.DATASTORE, x)
+			if !persist.FileExists(wantFile) {
+				d := getHash(x)
+				persist.WriteBytes(wantFile, *d)
+			}
+			bar.Add(1)
 		}
-		fmt.Println(hashList)
+		bar.FinishPrint("Download Complete, rebuilding...")
 		hash.Rebuild(hashList, env.DATASTORE, fileName+".rebuilt")
 	}
 }

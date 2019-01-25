@@ -19,6 +19,13 @@ type FileWriter struct {
 	FileName string
 }
 
+func FileExists(fileName string) bool {
+	if _, err := os.Stat(fileName); os.IsNotExist(err) {
+		return false
+	}
+	return true
+}
+
 func (f *FileWriter) Write(p []byte) (n int, err error) {
 	tmpName := WD + "/tmp/" + fmt.Sprint(atomic.AddUint32(&tmpFileNum, 1))
 	tmp, err := os.Create(tmpName)
