@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"github.com/gin-gonic/gin"
 	env "github.com/qubies/DTN/env"
 	//	hash "github.com/qubies/DTN/hashing"
