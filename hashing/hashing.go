@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"sync"
+
+	persist "github.com/qubies/DTN/persistentStore"
 )
 
 var BLOCK int
@@ -92,7 +94,9 @@ func GenerateHashList(fileName string) chan *FilePart {
 	return hashChannel
 }
 
-func Rebuild(hashList *[]string, directory string, finalPath string) {
+func Rebuild(filePath string, directory string, finalPath string) {
+	hashList := persist.HashListFromFile(filePath)
+
 	output, err := os.Create(finalPath)
 	if err != nil {
 		panic("Error creating file:" + err.Error())

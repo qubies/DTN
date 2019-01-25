@@ -7,7 +7,7 @@ import (
 	"encoding/gob"
 	env "github.com/qubies/DTN/env"
 	hash "github.com/qubies/DTN/hashing"
-	"os"
+	// "os"
 	// hashing "github.com/qubies/DTN/hashing"
 	input "github.com/qubies/DTN/input"
 	logging "github.com/qubies/DTN/logging"
@@ -92,20 +92,6 @@ func main() {
 		fmt.Println("File Stored")
 	}
 
-	//build the persistent read write channels.
-	hashFile, _ := os.Open(filepath.Join(env.HASHLIST, fileName))
-	dec := gob.NewDecoder(hashFile)
-	rebuildList := new([]string)
-	dec.Decode(rebuildList)
-	// hashStore := persist.NewFOB(filepath.Join(env.HASHLIST, fileName), rebuildList)
-	// fmt.Println("File:", hashStore.FileName)
-	// hashStore.ReadBlocking()
-	hash.Rebuild(rebuildList, env.DATASTORE, "./rebuilt")
-	// // hashStore.Object = finalList
-
-	// // persistently write and ensure file is on drive
-	// hashStore.WriteBlocking()
-
-	// test := persist.NewFOB(env.HASHLIST, finalL)
-	// test.ReadBlocking()
+	//recreate the file for a test to ./rebuilt.
+	hash.Rebuild(filepath.Join(env.HASHLIST, fileName), env.DATASTORE, "./rebuilt")
 }

@@ -127,3 +127,15 @@ func ReadBytes(fileName string) ([]byte, error) {
 	}
 	return ioutil.ReadFile(fileName)
 }
+
+func HashListFromFile(filePath string) *[]string {
+	tmp := new([]string)
+	gFile, err := os.Open(filePath)
+	defer gFile.Close()
+	if err != nil {
+		logging.PanicOnError("Opening Gobfile", err)
+	}
+	dec := gob.NewDecoder(gFile)
+	dec.Decode(tmp)
+	return tmp
+}
