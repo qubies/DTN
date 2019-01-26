@@ -1,8 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"github.com/gin-gonic/gin"
 	env "github.com/qubies/DTN/env"
+	hashing "github.com/qubies/DTN/hashing"
 	logging "github.com/qubies/DTN/logging"
 	persist "github.com/qubies/DTN/persistentStore"
 	"net/http"
@@ -13,18 +15,22 @@ import (
 func uploadPost(c *gin.Context) {
 	fileName, _ := c.GetQuery("hash")
 	data, _ := c.GetRawData()
-	// fmt.Println(fileName, data)
-	persist.WriteBytes(filepath.Join(env.DATASTORE, fileName), data)
-	c.String(200, "ok")
+
+	hashForThisBlock := hashing.HashBlock(data)
+	if hashForThisBlock != fileName {
+		fmt.Println("Hash did not match")
+		c.String(http.StatusResetContent, "File Upload Incomplete")
+	} else {
+		persist.WriteBytes(filepath.Join(env.DATASTORE, fileName), data)
+		c.String(200, "ok")
+	}
 }
 
 func uploadList(c *gin.Context) {
 	fileName, _ := c.GetQuery("fileName")
 	hashList, _ := c.GetRawData()
-	// fmt.Println(fileName, data)
 	persist.WriteBytes(filepath.Join(env.HASHLIST, fileName), hashList)
 	c.String(200, "ok")
-
 }
 
 func getList(c *gin.Context) {

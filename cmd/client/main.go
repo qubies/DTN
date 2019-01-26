@@ -2,25 +2,24 @@ package main
 
 import (
 	"bytes"
-	"fmt"
-	// "fmt"
 	"encoding/gob"
+	"fmt"
 	env "github.com/qubies/DTN/env"
-	hash "github.com/qubies/DTN/hashing"
-	"gopkg.in/cheggaaa/pb.v1"
-	// "os"
-	// hashing "github.com/qubies/DTN/hashing"
+	hashing "github.com/qubies/DTN/hashing"
 	input "github.com/qubies/DTN/input"
 	logging "github.com/qubies/DTN/logging"
 	persist "github.com/qubies/DTN/persistentStore"
+	"gopkg.in/cheggaaa/pb.v1"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"path/filepath"
 	"sync"
 )
 
-const num_senders = 100
-const NUM_DOWNLOADERS = 100
+//number of senders (warning that this will unplug the pipeline to a degree and use more memory)
+const numSenders = 100
+const numDownloaders = 100
 
 func readResponse(response *http.Response) string {
 	defer response.Body.Close()
@@ -29,25 +28,46 @@ func readResponse(response *http.Response) string {
 	return string(contents)
 }
 
-func send(hash string, data []byte) bool {
+func sendFileBlock(hash string, data []byte) bool {
 	resp, err := http.Post("http://"+env.SERVER_URL+":"+env.RESTPORT+"/deposit?hash="+hash, "binary/octet-stream", bytes.NewReader(data))
 	logging.PanicOnError("Error creating HTTP request", err)
 	return readResponse(resp) == "ok"
 }
 
-func check(hash string) bool {
+func getFileBlock(hash string) *[]byte {
+	response, err := http.Get("http://" + env.SERVER_URL + ":" + env.RESTPORT + "/getData?hash=" + hash)
+	logging.PanicOnError("Get Request Hash", err)
+	b, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		panic(err)
+	}
+	hashOfB := hashing.HashBlock(b)
+	if hashOfB != hash {
+		panic("downloaded hash does not match")
+	}
+
+	return &b
+}
+
+func checkForHashOnServer(hash string) bool {
 	response, err := http.Get("http://" + env.SERVER_URL + ":" + env.RESTPORT + "/check?hash=" + hash)
 	logging.PanicOnError("Get Request to checker", err)
 	return readResponse(response) == "SEND"
 }
+
 func sendHashList(fileName string, data *bytes.Buffer) bool {
 	resp, err := http.Post("http://"+env.SERVER_URL+":"+env.RESTPORT+"/hashlist?fileName="+fileName, "binary/octet-stream", bytes.NewReader(data.Bytes()))
 	logging.PanicOnError("Get Request to checker", err)
 	return readResponse(resp) == "ok"
 }
+
 func getHashList(fileName string) *[]string {
 	response, err := http.Get("http://" + env.SERVER_URL + ":" + env.RESTPORT + "/getList?fileName=" + fileName)
 	logging.PanicOnError("Get Request Hash List", err)
+	if response.StatusCode == http.StatusNotFound {
+		fmt.Println("File Not Found on Server")
+		os.Exit(1)
+	}
 	hashList := new([]string)
 	dec := gob.NewDecoder(response.Body)
 	dec.Decode(hashList)
@@ -55,23 +75,109 @@ func getHashList(fileName string) *[]string {
 	return hashList
 }
 
-func getHash(hash string) *[]byte {
-	response, err := http.Get("http://" + env.SERVER_URL + ":" + env.RESTPORT + "/getData?hash=" + hash)
-	logging.PanicOnError("Get Request Hash", err)
-	b, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		panic(err)
-	}
-	return &b
-}
-
 func workDownloads(input chan string, wg *sync.WaitGroup, bar *pb.ProgressBar) {
 	for x := range input {
-		d := getHash(x)
+		d := getFileBlock(x)
 		persist.WriteBytes(filepath.Join(env.DATASTORE, x), *d)
 		bar.Add(1)
 	}
 	wg.Done()
+}
+
+func upload(fileName string) {
+	fmt.Println("Workers On Sending Pipeline:", numSenders)
+
+	fileBlockChannel, bar := hashing.GenerateHashList(fileName)
+
+	maxIndex := 0
+
+	var wg sync.WaitGroup
+	var hashList sync.Map
+	var uniqueHash sync.Map
+	var lock sync.Mutex
+
+	wg.Add(numSenders)
+
+	for x := 0; x < numSenders; x++ {
+		go func() {
+			for x := range fileBlockChannel {
+				lock.Lock()
+				if x.Index > maxIndex {
+					maxIndex = x.Index
+				}
+				lock.Unlock()
+				hashList.Store(x.Index, x.Hash)
+				_, ok := uniqueHash.LoadOrStore(x.Hash, true)
+				if !ok {
+
+					if checkForHashOnServer(x.Hash) {
+						sendFileBlock(x.Hash, x.Bytes)
+					}
+				}
+				bar.Increment()
+			}
+			wg.Done()
+		}()
+	}
+
+	wg.Wait()
+	bar.FinishPrint("Upload Complete")
+
+	// we assemble an ordered hashlist of the file blocks
+	finalList := make([]string, maxIndex+1)
+
+	// iterate over the sent hashes, which include an index of where they are in the file
+	// the index becomes the position in the final array.
+	hashList.Range(func(key, value interface{}) bool {
+		finalList[key.(int)] = value.(string)
+		return true
+	})
+
+	// in order to send the list, we encode the slice to a byte format.
+	var listStore bytes.Buffer
+	enc := gob.NewEncoder(&listStore)
+	enc.Encode(finalList)
+
+	// and we send
+	if sendHashList(fileName, &listStore) {
+		fmt.Println("File Stored")
+	}
+}
+
+func download(fileName string) {
+	// recreate the file for a test to ./rebuilt.
+	hashList := getHashList(fileName)
+
+	fmt.Println("Workers On Download Pipeline:", numDownloaders)
+
+	// add some emotion!
+	bar := pb.StartNew(len(*hashList))
+
+	// build the workers
+	workList := make(chan string, numDownloaders)
+	var wg sync.WaitGroup
+	for x := 0; x < numDownloaders; x++ {
+		wg.Add(1)
+		go workDownloads(workList, &wg, bar)
+	}
+
+	// do the work
+	for _, x := range *hashList {
+		wantFile := filepath.Join(env.DATASTORE, x)
+		// check if we already have the file locally
+		if !persist.FileExists(wantFile) {
+			workList <- x
+		} else {
+			//file found locally
+			bar.Add(1)
+		}
+	}
+
+	// Clean up
+	close(workList)
+	wg.Wait()
+	bar.FinishPrint("Download Complete, rebuilding...")
+	hashing.Rebuild(hashList, env.DATASTORE, fileName+".rebuilt")
 }
 
 func main() {
@@ -80,68 +186,9 @@ func main() {
 	logging.Initialize()
 
 	if op == 'u' {
+		upload(fileName)
 
-		// curently this just generates a hashlist for testing purposes.
-		fmt.Println("Workers On Sending Pipeline:", num_senders)
-		partChan := hash.GenerateHashList(fileName)
-		var wg sync.WaitGroup
-
-		wg.Add(num_senders) //number of senders (warning that this will unplug the pipeline to a degree and use more memory)
-		maxIndex := 0
-
-		var hashList sync.Map
-		var uniqueHash sync.Map
-		for x := 0; x < num_senders; x++ {
-			go func() {
-				for x := range partChan {
-					if x.Index > maxIndex {
-						maxIndex = x.Index
-					}
-					hashList.Store(x.Index, x.Hash)
-					_, ok := uniqueHash.LoadOrStore(x.Hash, true)
-					if !ok {
-
-						if check(x.Hash) {
-							send(x.Hash, x.Bytes)
-						}
-					}
-				}
-				wg.Done()
-			}()
-		}
-		wg.Wait()
-
-		finalList := make([]string, maxIndex+1)
-		hashList.Range(func(key, value interface{}) bool {
-			finalList[key.(int)] = value.(string)
-			return true
-		})
-		var listStore bytes.Buffer
-		enc := gob.NewEncoder(&listStore)
-		enc.Encode(finalList)
-		if sendHashList(fileName, &listStore) {
-			fmt.Println("File Stored")
-		}
 	} else if op == 'd' {
-		//recreate the file for a test to ./rebuilt.
-		hashList := getHashList(fileName)
-
-		workList := make(chan string, NUM_DOWNLOADERS)
-		var wg sync.WaitGroup
-		bar := pb.StartNew(len(*hashList))
-		for x := 0; x < NUM_DOWNLOADERS; x++ {
-			wg.Add(1)
-			go workDownloads(workList, &wg, bar)
-		}
-		for _, x := range *hashList {
-			wantFile := filepath.Join(env.DATASTORE, x)
-			if !persist.FileExists(wantFile) {
-				workList <- x
-			}
-		}
-		close(workList)
-		wg.Wait()
-		bar.FinishPrint("Download Complete, rebuilding...")
-		hash.Rebuild(hashList, env.DATASTORE, fileName+".rebuilt")
+		download(fileName)
 	}
 }

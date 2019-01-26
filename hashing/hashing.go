@@ -5,14 +5,12 @@ import (
 	"encoding/hex"
 	"fmt"
 	"gopkg.in/cheggaaa/pb.v1"
-
 	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
 	"sync"
-	// persist "github.com/qubies/DTN/persistentStore"
 )
 
 var BLOCK int
@@ -24,7 +22,7 @@ var NUM_WORKERS int = runtime.GOMAXPROCS(0)
 
 var BUFFERSIZE int = NUM_WORKERS + 1 // add some space for the gatherer
 
-func hashBlock(info []byte) string {
+func HashBlock(info []byte) string {
 	h := hashFunc.New()
 	h.Write(info)
 	return hex.EncodeToString(h.Sum(nil))
@@ -38,14 +36,14 @@ type FilePart struct {
 
 func workChan(input <-chan (*FilePart), output chan<- (*FilePart), wg *sync.WaitGroup) {
 	for local := range input {
-		local.Hash = hashBlock(local.Bytes)
+		local.Hash = HashBlock(local.Bytes)
 		output <- local
 	}
 	wg.Done()
 }
 
 //this is the only exported function, it should generate a lsit of Hashes.
-func GenerateHashList(fileName string) chan *FilePart {
+func GenerateHashList(fileName string) (chan *FilePart, *pb.ProgressBar) {
 	fmt.Println("Workers On Hash Pipeline:", NUM_WORKERS)
 	fmt.Println("Blocksize:", BLOCKSIZE/1000, "kB")
 	file, err := os.Open(fileName)
@@ -82,16 +80,16 @@ func GenerateHashList(fileName string) chan *FilePart {
 				OR.Bytes = append([]byte(nil), OR.Bytes[:bytesRead]...)
 			}
 			dataChannel <- OR
-			bar.Increment()
+			// bar.Increment()
 			Index++
 		}
 
 		close(dataChannel)
 		wg.Wait()
 		close(hashChannel)
-		bar.FinishPrint("The End!")
+		// bar.FinishPrint("The End!")
 	}()
-	return hashChannel
+	return hashChannel, bar
 }
 
 func Rebuild(hashList *[]string, directory string, finalPath string) {
@@ -117,6 +115,6 @@ func Rebuild(hashList *[]string, directory string, finalPath string) {
 func HashFile(fileName string) string {
 	f, _ := os.Open(fileName)
 	d, _ := ioutil.ReadAll(f)
-	fmt.Println("FileHash:", hashBlock(d))
-	return hashBlock(d)
+	fmt.Println("FileHash:", HashBlock(d))
+	return HashBlock(d)
 }
