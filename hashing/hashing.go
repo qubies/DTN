@@ -66,7 +66,7 @@ func GenerateHashList(fileName string) (chan *FilePart, *pb.ProgressBar) {
 		// Could not obtain stat, handle error
 	}
 
-	bar := pb.StartNew(int(fileInfo.Size()/int64(BLOCKSIZE) + 1))
+	bar := pb.StartNew(int(fileInfo.Size())).SetUnits(pb.U_BYTES)
 	go func() {
 		for {
 			OR := new(FilePart)

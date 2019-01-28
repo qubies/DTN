@@ -79,7 +79,7 @@ func workDownloads(input chan string, wg *sync.WaitGroup, bar *pb.ProgressBar) {
 	for x := range input {
 		d := getFileBlock(x)
 		persist.WriteBytes(filepath.Join(env.DATASTORE, x), *d)
-		bar.Add(1)
+		bar.Add(env.BLOCK * 1000)
 	}
 	wg.Done()
 }
@@ -114,7 +114,7 @@ func upload(fileName string) {
 						sendFileBlock(x.Hash, x.Bytes)
 					}
 				}
-				bar.Increment()
+				bar.Add(env.BLOCK * 1000)
 			}
 			wg.Done()
 		}()
@@ -151,7 +151,7 @@ func download(fileName string) {
 	fmt.Println("Workers On Download Pipeline:", numDownloaders)
 
 	// add some emotion!
-	bar := pb.StartNew(len(*hashList))
+	bar := pb.StartNew(len(*hashList) * env.BLOCK * 1000).SetUnits(pb.U_BYTES)
 
 	// build the workers
 	workList := make(chan string, numDownloaders)
@@ -169,7 +169,7 @@ func download(fileName string) {
 			workList <- x
 		} else {
 			//file found locally
-			bar.Add(1)
+			bar.Increment()
 		}
 	}
 
