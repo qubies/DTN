@@ -9,6 +9,7 @@ import (
 	hashing "github.com/qubies/DTN/hashing"
 	logging "github.com/qubies/DTN/logging"
 	persist "github.com/qubies/DTN/persistentStore"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -52,18 +53,9 @@ func checkMeta(name string, newMeta *[]string) {
 	f := filepath.Join(env.HASHLIST, name)
 	if persist.FileExists(f) {
 		oldHashList := persist.HashListFromFile(f)
-		hashSet := make(map[string]bool)
-		for _, hash := range *newMeta {
-			increaseCount(hash)
-			hashSet[hash] = true
-		}
 		for _, hash := range *oldHashList {
-			if _, ok := hashSet[hash]; !ok {
-				// decrement the count because its different.
-				deleteCount(hash)
-			}
+			deleteCount(hash)
 		}
-
 	}
 }
 
@@ -95,6 +87,25 @@ func getList(c *gin.Context) {
 	c.Data(200, "binary/octet-stream", data)
 }
 
+func loadRefs() {
+	files, err := ioutil.ReadDir(env.HASHLIST)
+	logging.PanicOnError("Unable to open hashlist directory", err)
+	fmt.Println("Loading Hash List from store")
+	for _, f := range files {
+		thisMeta := persist.HashListFromFile(filepath.Join(env.HASHLIST, f.Name()))
+		for _, hash := range *thisMeta {
+			increaseCount(hash)
+		}
+	}
+	fmt.Println("Cleaning up any unneeded files...")
+	hashes, err := ioutil.ReadDir(env.DATASTORE)
+	logging.PanicOnError("Unable to open hash directory", err)
+	for _, hash := range hashes {
+		if _, ok := references[hash.Name()]; !ok {
+			os.Remove(filepath.Join(env.DATASTORE, hash.Name()))
+		}
+	}
+}
 func getData(c *gin.Context) {
 	hash, _ := c.GetQuery("hash")
 	data, err := persist.ReadBytes(filepath.Join(env.DATASTORE, hash))
@@ -108,6 +119,7 @@ func getData(c *gin.Context) {
 
 func checkHash(c *gin.Context) {
 	hash, _ := c.GetQuery("hash")
+	increaseCount(hash)
 	if _, err := os.Stat(filepath.Join(env.DATASTORE, hash)); os.IsNotExist(err) {
 		c.String(http.StatusOK, "SEND")
 	} else {
@@ -132,6 +144,7 @@ func startup() {
 	references = make(map[string]int)
 	env.BuildEnv()
 	logging.Initialize()
+	loadRefs()
 }
 
 func main() {
