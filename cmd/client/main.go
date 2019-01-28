@@ -109,7 +109,6 @@ func upload(fileName string) {
 				hashList.Store(x.Index, x.Hash)
 				_, ok := uniqueHash.LoadOrStore(x.Hash, true)
 				if !ok {
-
 					if checkForHashOnServer(x.Hash) {
 						sendFileBlock(x.Hash, x.Bytes)
 					}
@@ -169,7 +168,7 @@ func download(fileName string) {
 			workList <- x
 		} else {
 			//file found locally
-			bar.Increment()
+			bar.Add(env.BLOCK * 1000)
 		}
 	}
 
