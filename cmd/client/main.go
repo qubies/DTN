@@ -55,6 +55,12 @@ func checkForHashOnServer(hash string) bool {
 	return readResponse(response) == "SEND"
 }
 
+func deleteFileFromServer(fileName string) bool {
+	response, err := http.Get("http://" + env.SERVER_URL + ":" + env.RESTPORT + "/DELETE?fileName=" + fileName)
+	logging.PanicOnError("DELETE request error", err)
+	return readResponse(response) == "ok"
+}
+
 func sendHashList(fileName string, data *bytes.Buffer) bool {
 	resp, err := http.Post("http://"+env.SERVER_URL+":"+env.RESTPORT+"/hashlist?fileName="+fileName, "binary/octet-stream", bytes.NewReader(data.Bytes()))
 	logging.PanicOnError("Get Request to checker", err)
@@ -179,6 +185,21 @@ func download(fileName string) {
 	hashing.Rebuild(hashList, env.DATASTORE, fileName+".rebuilt")
 }
 
+func deleteFile(fileName string) {
+	ok := deleteFileFromServer(fileName)
+	if ok {
+		fmt.Println("Successfully Removed", fileName)
+	} else {
+		fmt.Println("Unable to remove", fileName)
+	}
+}
+
+func list() {
+	response, err := http.Get("http://" + env.SERVER_URL + ":" + env.RESTPORT + "/fileList")
+	logging.PanicOnError("list request error", err)
+	fmt.Println(readResponse(response))
+}
+
 func main() {
 	fileName, op := input.CollectOptions()
 	env.BuildEnv()
@@ -189,5 +210,9 @@ func main() {
 
 	} else if op == 'd' {
 		download(fileName)
+	} else if op == 'r' {
+		deleteFile(fileName)
+	} else if op == 'l' {
+		list()
 	}
 }

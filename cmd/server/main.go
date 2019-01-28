@@ -49,7 +49,7 @@ func increaseCount(hash string) {
 	references[hash]++
 }
 
-func checkMeta(name string, newMeta *[]string) {
+func removeLinkCounts(name string) {
 	f := filepath.Join(env.HASHLIST, name)
 	if persist.FileExists(f) {
 		oldHashList := persist.HashListFromFile(f)
@@ -70,7 +70,7 @@ func uploadList(c *gin.Context) {
 		c.String(http.StatusExpectationFailed, "HashList failed to decode")
 		return
 	}
-	checkMeta(fileName, hashList)
+	removeLinkCounts(fileName)
 	persist.WriteBytes(filepath.Join(env.HASHLIST, fileName), hashData)
 	c.String(200, "ok")
 }
@@ -127,6 +127,31 @@ func checkHash(c *gin.Context) {
 	}
 }
 
+func deleteFile(c *gin.Context) {
+	fileName, _ := c.GetQuery("fileName")
+	removeLinkCounts(fileName)
+	err := os.Remove(filepath.Join(env.HASHLIST, fileName))
+	if err == nil {
+		c.String(200, "ok")
+	} else {
+		c.String(200, "Remove Failed")
+	}
+}
+
+func fileList(c *gin.Context) {
+	files, err := ioutil.ReadDir(env.HASHLIST)
+	logging.PanicOnError("Reading file list", err)
+	var resp string
+	for _, file := range files {
+		if resp == "" {
+			resp = file.Name()
+		} else {
+			resp += "\n" + file.Name()
+		}
+	}
+	c.String(200, resp)
+}
+
 func runServer() {
 	// adapted from the gin docs example
 	//initialize the api
@@ -137,6 +162,8 @@ func runServer() {
 	router.GET("/check", checkHash)
 	router.GET("/getList", getList)
 	router.GET("/getData", getData)
+	router.GET("/fileList", fileList)
+	router.GET("/DELETE", deleteFile)
 	router.POST("/hashlist", uploadList)
 	router.Run(":" + env.RESTPORT)
 }
