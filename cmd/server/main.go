@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"encoding/gob"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	env "github.com/qubies/DTN/env"
@@ -10,7 +12,11 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sync"
 )
+
+var references map[string]int
+var refLock sync.Mutex
 
 func uploadPost(c *gin.Context) {
 	fileName, _ := c.GetQuery("hash")
@@ -26,10 +32,54 @@ func uploadPost(c *gin.Context) {
 	}
 }
 
+func deleteCount(hash string) {
+	refLock.Lock()
+	defer refLock.Unlock()
+	references[hash]--
+	if references[hash] <= 0 {
+		os.Remove(filepath.Join(env.DATASTORE, hash))
+		delete(references, hash)
+	}
+}
+
+func increaseCount(hash string) {
+	refLock.Lock()
+	defer refLock.Unlock()
+	references[hash]++
+}
+
+func checkMeta(name string, newMeta *[]string) {
+	f := filepath.Join(env.HASHLIST, name)
+	if persist.FileExists(f) {
+		oldHashList := persist.HashListFromFile(f)
+		hashSet := make(map[string]bool)
+		for _, hash := range *newMeta {
+			increaseCount(hash)
+			hashSet[hash] = true
+		}
+		for _, hash := range *oldHashList {
+			if _, ok := hashSet[hash]; !ok {
+				// decrement the count because its different.
+				deleteCount(hash)
+			}
+		}
+
+	}
+}
+
 func uploadList(c *gin.Context) {
 	fileName, _ := c.GetQuery("fileName")
-	hashList, _ := c.GetRawData()
-	persist.WriteBytes(filepath.Join(env.HASHLIST, fileName), hashList)
+	hashData, _ := c.GetRawData()
+	hashList := new([]string)
+	dec := gob.NewDecoder(bytes.NewReader(hashData))
+	err := dec.Decode(hashList)
+	if err != nil {
+		fmt.Println("Gob decode on uploaded list failed")
+		c.String(http.StatusExpectationFailed, "HashList failed to decode")
+		return
+	}
+	checkMeta(fileName, hashList)
+	persist.WriteBytes(filepath.Join(env.HASHLIST, fileName), hashData)
 	c.String(200, "ok")
 }
 
@@ -79,6 +129,7 @@ func runServer() {
 	router.Run(":" + env.RESTPORT)
 }
 func startup() {
+	references = make(map[string]int)
 	env.BuildEnv()
 	logging.Initialize()
 }
