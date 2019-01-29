@@ -18,8 +18,6 @@ import (
 )
 
 //number of senders (warning that this will unplug the pipeline to a degree and use more memory)
-const numSenders = 100
-const numDownloaders = 100
 
 func readResponse(response *http.Response) string {
 	defer response.Body.Close()
@@ -91,7 +89,7 @@ func workDownloads(input chan string, wg *sync.WaitGroup, bar *pb.ProgressBar) {
 }
 
 func upload(fileName string) {
-	fmt.Println("Workers On Sending Pipeline:", numSenders)
+	fmt.Println("Workers On Sending Pipeline:", env.NUM_UPLOAD_WORKERS)
 
 	fileBlockChannel, bar := hashing.GenerateHashList(fileName)
 
@@ -102,9 +100,9 @@ func upload(fileName string) {
 	var uniqueHash sync.Map
 	var lock sync.Mutex
 
-	wg.Add(numSenders)
+	wg.Add(env.NUM_UPLOAD_WORKERS)
 
-	for x := 0; x < numSenders; x++ {
+	for x := 0; x < env.NUM_UPLOAD_WORKERS; x++ {
 		go func() {
 			for x := range fileBlockChannel {
 				lock.Lock()
@@ -153,15 +151,15 @@ func download(fileName string) {
 	// recreate the file for a test to ./rebuilt.
 	hashList := getHashList(fileName)
 
-	fmt.Println("Workers On Download Pipeline:", numDownloaders)
+	fmt.Println("Workers On Download Pipeline:", env.NUM_DOWNLOAD_WORKERS)
 
 	// add some emotion!
 	bar := pb.StartNew(len(*hashList) * env.BLOCK * 1000).SetUnits(pb.U_BYTES)
 
 	// build the workers
-	workList := make(chan string, numDownloaders)
+	workList := make(chan string, env.NUM_DOWNLOAD_WORKERS)
 	var wg sync.WaitGroup
-	for x := 0; x < numDownloaders; x++ {
+	for x := 0; x < env.NUM_DOWNLOAD_WORKERS; x++ {
 		wg.Add(1)
 		go workDownloads(workList, &wg, bar)
 	}
@@ -201,8 +199,8 @@ func list() {
 }
 
 func main() {
-	fileName, op := input.CollectOptions()
 	env.BuildEnv()
+	fileName, op := input.CollectOptions()
 	logging.Initialize()
 
 	if op == 'u' {

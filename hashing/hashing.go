@@ -9,16 +9,13 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"runtime"
 	"sync"
 )
 
 var BLOCK int
 var BLOCKSIZE int
 
-var NUM_WORKERS int = runtime.GOMAXPROCS(0)
-
-// var NUM_WORKERS int = 1
+var NUM_WORKERS int
 
 var BUFFERSIZE int = NUM_WORKERS + 1 // add some space for the gatherer
 
