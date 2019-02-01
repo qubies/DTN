@@ -27,6 +27,7 @@ var NUM_HASH_WORKERS int
 
 func BuildEnv() {
 	e.Load(".env")
+
 	WD = os.Getenv("WORKING_DIRECTORY")
 	DATASTORE = os.Getenv("DATASTORE")
 	HASHLIST = os.Getenv("HASH_LIST")
@@ -34,10 +35,12 @@ func BuildEnv() {
 	LOGFILE = os.Getenv("LOGFILE")
 	RESTPORT = os.Getenv("RESTPORT")
 	SERVER_URL = os.Getenv("SERVER_URL")
+
 	NUM_DOWNLOAD_WORKERS, _ = strconv.Atoi(os.Getenv("NUM_DOWNLOAD_WORKERS"))
 	NUM_UPLOAD_WORKERS, _ = strconv.Atoi(os.Getenv("NUM_UPLOAD_WORKERS"))
 	NUM_HASH_WORKERS, _ = strconv.Atoi(os.Getenv("NUM_HASH_WORKERS"))
 	BLOCK, _ = strconv.Atoi(os.Getenv("BLOCK"))
+
 	persist.WD = WD
 	logging.LOGFILE = LOGFILE
 	hashing.BLOCK = BLOCK

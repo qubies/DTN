@@ -117,7 +117,7 @@ func upload(fileName string) {
 						sendFileBlock(x.Hash, x.Bytes)
 					}
 				}
-				bar.Add(env.BLOCK * 1000)
+				bar.Add(len(x.Bytes))
 			}
 			wg.Done()
 		}()
