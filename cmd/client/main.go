@@ -29,6 +29,8 @@ func readResponse(response *http.Response) string {
 func sendFileBlock(hash string, data []byte) bool {
 	resp, err := http.Post("http://"+env.SERVER_URL+":"+env.RESTPORT+"/deposit?hash="+hash, "binary/octet-stream", bytes.NewReader(data))
 	logging.PanicOnError("Error creating HTTP request", err)
+	// write the file into the cache.
+	persist.WriteBytes(filepath.Join(env.DATASTORE, hash), data)
 	return readResponse(resp) == "ok"
 }
 
@@ -83,7 +85,7 @@ func workDownloads(input chan string, wg *sync.WaitGroup, bar *pb.ProgressBar) {
 	for x := range input {
 		d := getFileBlock(x)
 		persist.WriteBytes(filepath.Join(env.DATASTORE, x), *d)
-		bar.Add(env.BLOCK * 1000)
+		bar.Add(len(*d))
 	}
 	wg.Done()
 }
@@ -154,7 +156,7 @@ func download(fileName string) {
 	fmt.Println("Workers On Download Pipeline:", env.NUM_DOWNLOAD_WORKERS)
 
 	// add some emotion!
-	bar := pb.StartNew(len(*hashList) * env.BLOCK * 1000).SetUnits(pb.U_BYTES)
+	bar := pb.StartNew(len(*hashList) * env.MAXIMUM_BLOCK_SIZE).SetUnits(pb.U_BYTES)
 
 	// build the workers
 	workList := make(chan string, env.NUM_DOWNLOAD_WORKERS)
@@ -172,7 +174,7 @@ func download(fileName string) {
 			workList <- x
 		} else {
 			//file found locally
-			bar.Add(env.BLOCK * 1000)
+			bar.Add(int(persist.FileSize(wantFile)))
 		}
 	}
 

@@ -26,6 +26,14 @@ func FileExists(fileName string) bool {
 	return true
 }
 
+func FileSize(fileName string) int64 {
+	fi, err := os.Stat(fileName)
+	if err != nil {
+		return 0
+	}
+	return fi.Size()
+}
+
 func (f *FileWriter) Write(p []byte) (n int, err error) {
 	tmpName := WD + "/tmp/" + fmt.Sprint(atomic.AddUint32(&tmpFileNum, 1))
 	tmp, err := os.Create(tmpName)

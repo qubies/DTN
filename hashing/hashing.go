@@ -14,12 +14,10 @@ import (
 	"sync"
 )
 
-var BLOCK int
-var BLOCKSIZE int
-
-const WINDOW_SIZE = 10000
-const HASH_MATCH = "123456"
-const MINIMUM_SIZE = 100000
+var HASH_WINDOW_SIZE int
+var HASH_MATCHING_STRING string
+var MINIMUM_BLOCK_SIZE int
+var MAXIMUM_BLOCK_SIZE int
 
 var NUM_WORKERS int
 
@@ -33,7 +31,7 @@ func HashBlock(info []byte) string {
 
 func xx(info []byte) string {
 	// fmt.Println("xxhash:", xxhash.Sum64(info))
-	return fmt.Sprint(xxhash.Sum64(info))
+	return fmt.Sprintf("%20d", xxhash.Sum64(info))
 }
 
 type FilePart struct {
@@ -53,7 +51,6 @@ func workChan(input <-chan (*FilePart), output chan<- (*FilePart), wg *sync.Wait
 //this is the only exported function, it should generate a lsit of Hashes.
 func GenerateHashList(fileName string) (chan *FilePart, *pb.ProgressBar) {
 	fmt.Println("Workers On Hash Pipeline:", NUM_WORKERS)
-	fmt.Println("Blocksize:", BLOCKSIZE/1000, "kB")
 	file, err := os.Open(fileName)
 	if err != nil {
 		fmt.Println(err)
@@ -81,34 +78,30 @@ func GenerateHashList(fileName string) (chan *FilePart, *pb.ProgressBar) {
 			bytesRead := 0
 			OR := new(FilePart)
 			OR.Index = Index
-			OR.Bytes = make([]byte, BLOCKSIZE)
+			OR.Bytes = make([]byte, MAXIMUM_BLOCK_SIZE)
 			var err error
 			var c byte
 			for {
-				if bytesRead == BLOCKSIZE {
-					fmt.Println("The block was filled")
+				if bytesRead == MAXIMUM_BLOCK_SIZE {
+					// fmt.Println("The block was filled")
 					break
 				}
 				c, err = rd.ReadByte()
 				if err != nil {
 					break
 				}
-				if bytesRead > len(OR.Bytes)-1 {
-					fmt.Println("BLOCKSIZE:", BLOCKSIZE, "MINIMUM_SIZE:", MINIMUM_SIZE, "bytesRead:", bytesRead)
-					fmt.Println("Len", len(OR.Bytes))
-				}
 				OR.Bytes[bytesRead] = byte(c)
-				hv := xx(OR.Bytes[max(bytesRead-WINDOW_SIZE-1, 0):bytesRead])
+				hv := xx(OR.Bytes[max(bytesRead-HASH_WINDOW_SIZE-1, 0):bytesRead])
 				bytesRead++
-				if hv[len(hv)-len(HASH_MATCH):] == HASH_MATCH {
-					if bytesRead < MINIMUM_SIZE {
+				if hv[len(hv)-len(HASH_MATCHING_STRING):] == HASH_MATCHING_STRING {
+					if bytesRead < MINIMUM_BLOCK_SIZE {
 						continue
 					}
-					fmt.Println("Match")
+					// fmt.Println("Match")
 					break
 				}
 			}
-			if bytesRead != BLOCKSIZE {
+			if bytesRead != MAXIMUM_BLOCK_SIZE {
 				OR.Bytes = append([]byte(nil), OR.Bytes[:bytesRead]...)
 			}
 			dataChannel <- OR

@@ -19,11 +19,15 @@ var BLOOMFILTER string
 var LOGFILE string
 var RESTPORT string
 var SERVER_URL string
-var BLOCK int
 
 var NUM_DOWNLOAD_WORKERS int
 var NUM_UPLOAD_WORKERS int
 var NUM_HASH_WORKERS int
+
+var MINIMUM_BLOCK_SIZE int
+var MAXIMUM_BLOCK_SIZE int
+var HASH_WINDOW_SIZE int
+var HASH_MATCHING_STRING string
 
 func BuildEnv() {
 	e.Load(".env")
@@ -35,17 +39,22 @@ func BuildEnv() {
 	LOGFILE = os.Getenv("LOGFILE")
 	RESTPORT = os.Getenv("RESTPORT")
 	SERVER_URL = os.Getenv("SERVER_URL")
+	HASH_MATCHING_STRING = os.Getenv("HASH_MATCHING_STRING")
 
 	NUM_DOWNLOAD_WORKERS, _ = strconv.Atoi(os.Getenv("NUM_DOWNLOAD_WORKERS"))
 	NUM_UPLOAD_WORKERS, _ = strconv.Atoi(os.Getenv("NUM_UPLOAD_WORKERS"))
 	NUM_HASH_WORKERS, _ = strconv.Atoi(os.Getenv("NUM_HASH_WORKERS"))
-	BLOCK, _ = strconv.Atoi(os.Getenv("BLOCK"))
+	MINIMUM_BLOCK_SIZE, _ = strconv.Atoi(os.Getenv("MINIMUM_BLOCK_SIZE"))
+	MAXIMUM_BLOCK_SIZE, _ = strconv.Atoi(os.Getenv("MAXIMUM_BLOCK_SIZE"))
+	HASH_WINDOW_SIZE, _ = strconv.Atoi(os.Getenv("HASH_WINDOW_SIZE"))
 
 	persist.WD = WD
 	logging.LOGFILE = LOGFILE
-	hashing.BLOCK = BLOCK
-	hashing.BLOCKSIZE = BLOCK * 1000
 	hashing.NUM_WORKERS = NUM_HASH_WORKERS
+	hashing.HASH_WINDOW_SIZE = HASH_WINDOW_SIZE
+	hashing.HASH_MATCHING_STRING = HASH_MATCHING_STRING
+	hashing.MINIMUM_BLOCK_SIZE = MINIMUM_BLOCK_SIZE
+	hashing.MAXIMUM_BLOCK_SIZE = MAXIMUM_BLOCK_SIZE
 
 	//if the working directory does not exist, then create it.
 	if _, err := os.Stat(WD); os.IsNotExist(err) {
