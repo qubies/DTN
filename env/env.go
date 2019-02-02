@@ -1,7 +1,6 @@
 package env
 
 import (
-	"fmt"
 	e "github.com/joho/godotenv"
 	hashing "github.com/qubies/DTN/hashing"
 	logging "github.com/qubies/DTN/logging"
@@ -67,5 +66,5 @@ func BuildEnv() {
 		os.MkdirAll(HASHLIST, os.ModePerm)
 		os.MkdirAll(filepath.Join(WD, "tmp"), os.ModePerm)
 	}
-	fmt.Println("Working Directory:", WD)
+	// fmt.Println("Working Directory:", WD)
 }
