@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"text/tabwriter"
 )
 
 var references map[string]int
@@ -139,18 +140,16 @@ func deleteFile(c *gin.Context) {
 }
 
 func fileList(c *gin.Context) {
+	w := new(tabwriter.Writer)
+	w.Init(c.Writer, 0, 8, 0, '\t', 0)
 	files, err := ioutil.ReadDir(env.HASHLIST)
 	logging.PanicOnError("Reading file list", err)
-	var resp string
+	fmt.Fprintln(w, "Name\tSize (bytes)")
 	for _, file := range files {
 		hl := persist.HashListFromFile(filepath.Join(env.HASHLIST, file.Name()))
-		if resp == "" {
-			resp = file.Name() + " Size: " + fmt.Sprint(hl.Size)
-		} else {
-			resp += "\n" + file.Name() + " Size: " + fmt.Sprint(hl.Size)
-		}
+		fmt.Fprintf(w, "%v\t%v\n", file.Name(), hl.Size)
 	}
-	c.String(200, resp)
+	w.Flush()
 }
 
 func runServer() {
