@@ -160,7 +160,7 @@ func download(fileName string) {
 	fmt.Println("Workers On Download Pipeline:", env.NUM_DOWNLOAD_WORKERS)
 
 	// add some emotion!
-	bar := pb.StartNew(len(hashList.Hashes) * env.MAXIMUM_BLOCK_SIZE).SetUnits(pb.U_BYTES)
+	bar := pb.StartNew(int(hashList.Size)).SetUnits(pb.U_BYTES)
 
 	// build the workers
 	workList := make(chan string, env.NUM_DOWNLOAD_WORKERS)
