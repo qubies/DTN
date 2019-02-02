@@ -8,15 +8,16 @@ import (
 	"io/ioutil"
 	"os"
 	"sync/atomic"
-	// "time"
+	"time"
 )
 
 var WD string
 var tmpFileNum uint32
 
 type FileInfo struct {
-	Hashes []string
-	Size   uint64
+	Hashes       []string
+	Size         uint64
+	ModifiedDate time.Time
 }
 
 // FileObject is a convenience wrapper to a persistent store object.

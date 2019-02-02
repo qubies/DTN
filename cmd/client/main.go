@@ -15,6 +15,8 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
+	"time"
 )
 
 //number of senders (warning that this will unplug the pipeline to a degree and use more memory)
@@ -89,6 +91,30 @@ func workDownloads(input chan string, wg *sync.WaitGroup, bar *pb.ProgressBar) {
 	}
 	wg.Done()
 }
+func sendFileInfo(hashList *sync.Map, fileName string, maxIndex int, fileSize uint64) {
+	finalList := make([]string, maxIndex+1)
+
+	// iterate over the sent hashes, which include an index of where they are in the file
+	// the index becomes the position in the final array.
+	hashList.Range(func(key, value interface{}) bool {
+		finalList[key.(int)] = value.(string)
+		return true
+	})
+	var fi persist.FileInfo
+	fi.Hashes = finalList
+	fi.Size = fileSize
+	fi.ModifiedDate = time.Now()
+
+	// in order to send the list, we encode the slice to a byte format.
+	var listStore bytes.Buffer
+	enc := gob.NewEncoder(&listStore)
+	enc.Encode(&fi)
+
+	// and we send
+	if sendHashList(fileName, &listStore) {
+		fmt.Println("File Stored")
+	}
+}
 
 func upload(fileName string) {
 	fmt.Println("Workers On Sending Pipeline:", env.NUM_UPLOAD_WORKERS)
@@ -101,6 +127,8 @@ func upload(fileName string) {
 	var hashList sync.Map
 	var uniqueHash sync.Map
 	var lock sync.Mutex
+	var cacheHits uint64
+	var cacheMisses uint64
 
 	wg.Add(env.NUM_UPLOAD_WORKERS)
 
@@ -118,6 +146,9 @@ func upload(fileName string) {
 				if !ok {
 					if checkForHashOnServer(x.Hash) {
 						sendFileBlock(x.Hash, x.Bytes)
+						atomic.AddUint64(&cacheMisses, 1)
+					} else {
+						atomic.AddUint64(&cacheHits, 1)
 					}
 				}
 				bar.Add(len(x.Bytes))
@@ -127,33 +158,20 @@ func upload(fileName string) {
 	}
 
 	wg.Wait()
+	sendFileInfo(&hashList, fileName, maxIndex, fileSize)
 	bar.FinishPrint("Upload Complete")
+	printCaches(cacheHits, cacheMisses)
+}
 
-	// we assemble an ordered hashlist of the file blocks
-	finalList := make([]string, maxIndex+1)
-
-	// iterate over the sent hashes, which include an index of where they are in the file
-	// the index becomes the position in the final array.
-	hashList.Range(func(key, value interface{}) bool {
-		finalList[key.(int)] = value.(string)
-		return true
-	})
-	var fi persist.FileInfo
-	fi.Hashes = finalList
-	fi.Size = fileSize
-
-	// in order to send the list, we encode the slice to a byte format.
-	var listStore bytes.Buffer
-	enc := gob.NewEncoder(&listStore)
-	enc.Encode(&fi)
-
-	// and we send
-	if sendHashList(fileName, &listStore) {
-		fmt.Println("File Stored")
-	}
+func printCaches(cacheHits, cacheMisses uint64) {
+	fmt.Printf("     Cache Hits: %d\n", cacheHits)
+	fmt.Printf("   Cache Misses: %d\n", cacheMisses)
+	fmt.Printf("Cache Hit Ratio: %0.1f%%\n", float64(cacheHits)/float64(cacheMisses+cacheHits)*100)
 }
 
 func download(fileName string) {
+	var cacheHits uint64
+	var cacheMisses uint64
 	// recreate the file for a test to ./rebuilt.
 	hashList := getHashList(fileName)
 
@@ -176,8 +194,10 @@ func download(fileName string) {
 		// check if we already have the file locally
 		if !persist.FileExists(wantFile) {
 			workList <- x
+			atomic.AddUint64(&cacheMisses, 1)
 		} else {
 			//file found locally
+			atomic.AddUint64(&cacheHits, 1)
 			bar.Add(int(persist.FileSize(wantFile)))
 		}
 	}
@@ -185,7 +205,9 @@ func download(fileName string) {
 	// Clean up
 	close(workList)
 	wg.Wait()
-	bar.FinishPrint("Download Complete, rebuilding...")
+	bar.FinishPrint("Download Complete.")
+	printCaches(cacheHits, cacheMisses)
+	fmt.Println("rebuilding...")
 	hashing.Rebuild(&hashList.Hashes, env.DATASTORE, fileName+".rebuilt")
 }
 

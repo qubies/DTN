@@ -140,14 +140,14 @@ func deleteFile(c *gin.Context) {
 }
 
 func fileList(c *gin.Context) {
-	w := new(tabwriter.Writer)
-	w.Init(c.Writer, 0, 8, 0, '\t', 0)
+	w := tabwriter.NewWriter(c.Writer, 0, 8, 0, ' ', tabwriter.Debug)
 	files, err := ioutil.ReadDir(env.HASHLIST)
 	logging.PanicOnError("Reading file list", err)
-	fmt.Fprintln(w, "Name\tSize (bytes)")
+	fmt.Fprintln(w, " Name \t Size (bytes) \t Number of Blocks \t Modified ")
+	fmt.Fprintln(w, "------\t--------------\t------------------\t----------")
 	for _, file := range files {
 		hl := persist.HashListFromFile(filepath.Join(env.HASHLIST, file.Name()))
-		fmt.Fprintf(w, "%v\t%v\n", file.Name(), hl.Size)
+		fmt.Fprintf(w, " %v \t %v \t %v \t %v\n", file.Name(), hl.Size, len(hl.Hashes), hl.ModifiedDate.Format("Mon Jan _2 15:04:05 2006"))
 	}
 	w.Flush()
 }
