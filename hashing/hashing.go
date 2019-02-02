@@ -14,6 +14,7 @@ import (
 	"sync"
 )
 
+var DYNAMIC bool
 var HASH_WINDOW_SIZE int
 var HASH_MATCHING_STRING string
 var MINIMUM_BLOCK_SIZE int
@@ -91,14 +92,19 @@ func GenerateHashList(fileName string) (chan *FilePart, *pb.ProgressBar) {
 					break
 				}
 				OR.Bytes[bytesRead] = byte(c)
-				hv := xx(OR.Bytes[max(bytesRead-HASH_WINDOW_SIZE-1, 0):bytesRead])
-				bytesRead++
-				if hv[len(hv)-len(HASH_MATCHING_STRING):] == HASH_MATCHING_STRING {
-					if bytesRead < MINIMUM_BLOCK_SIZE {
-						continue
+				if DYNAMIC {
+
+					hv := xx(OR.Bytes[max(bytesRead-HASH_WINDOW_SIZE-1, 0):bytesRead])
+					bytesRead++
+					if hv[len(hv)-len(HASH_MATCHING_STRING):] == HASH_MATCHING_STRING {
+						if bytesRead < MINIMUM_BLOCK_SIZE {
+							continue
+						}
+						// fmt.Println("Match")
+						break
 					}
-					// fmt.Println("Match")
-					break
+				} else {
+					bytesRead++
 				}
 			}
 			if bytesRead != MAXIMUM_BLOCK_SIZE {

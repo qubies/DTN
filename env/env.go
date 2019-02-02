@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 )
 
 //.env consts
@@ -19,6 +20,7 @@ var BLOOMFILTER string
 var LOGFILE string
 var RESTPORT string
 var SERVER_URL string
+var DYNAMIC bool
 
 var NUM_DOWNLOAD_WORKERS int
 var NUM_UPLOAD_WORKERS int
@@ -40,6 +42,7 @@ func BuildEnv() {
 	RESTPORT = os.Getenv("RESTPORT")
 	SERVER_URL = os.Getenv("SERVER_URL")
 	HASH_MATCHING_STRING = os.Getenv("HASH_MATCHING_STRING")
+	DYNAMIC = strings.ToLower(os.Getenv("DYNAMIC")) == "true"
 
 	NUM_DOWNLOAD_WORKERS, _ = strconv.Atoi(os.Getenv("NUM_DOWNLOAD_WORKERS"))
 	NUM_UPLOAD_WORKERS, _ = strconv.Atoi(os.Getenv("NUM_UPLOAD_WORKERS"))
@@ -55,6 +58,7 @@ func BuildEnv() {
 	hashing.HASH_MATCHING_STRING = HASH_MATCHING_STRING
 	hashing.MINIMUM_BLOCK_SIZE = MINIMUM_BLOCK_SIZE
 	hashing.MAXIMUM_BLOCK_SIZE = MAXIMUM_BLOCK_SIZE
+	hashing.DYNAMIC = DYNAMIC
 
 	//if the working directory does not exist, then create it.
 	if _, err := os.Stat(WD); os.IsNotExist(err) {
