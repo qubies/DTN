@@ -120,7 +120,6 @@ safeFile testFiles/testfile2
 echo "and we send it again, it is slower, but notice the hitrate."
 send "./client -u testFiles/testfile2 && ./client -l"
 wait_u
-sed -i -e "1d" testFiles/testfile2
 
 splitLine
 echo "the server also has remove functionality, and it automatically cleans and removes unreferenced blocks to best effort."
@@ -146,4 +145,5 @@ wait_u
 echo "and we can also re download the testfile2, larger file for a good diff:"
 send "./client -d testfile2 && diff testfile2.rebuilt testFiles/testfile2"
 wait_u
+sed -i -e "1d" testFiles/testfile2
 end
