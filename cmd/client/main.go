@@ -67,14 +67,14 @@ func sendHashList(fileName string, data *bytes.Buffer) bool {
 	return readResponse(resp) == "ok"
 }
 
-func getHashList(fileName string) *[]string {
+func getHashList(fileName string) *persist.FileInfo {
 	response, err := http.Get("http://" + env.SERVER_URL + ":" + env.RESTPORT + "/getList?fileName=" + fileName)
 	logging.PanicOnError("Get Request Hash List", err)
 	if response.StatusCode == http.StatusNotFound {
 		fmt.Println("File Not Found on Server")
 		os.Exit(1)
 	}
-	hashList := new([]string)
+	hashList := new(persist.FileInfo)
 	dec := gob.NewDecoder(response.Body)
 	dec.Decode(hashList)
 	response.Body.Close()
@@ -96,7 +96,7 @@ func upload(fileName string) {
 	fileBlockChannel, bar := hashing.GenerateHashList(fileName)
 
 	maxIndex := 0
-
+	var fileSize uint64
 	var wg sync.WaitGroup
 	var hashList sync.Map
 	var uniqueHash sync.Map
@@ -111,6 +111,7 @@ func upload(fileName string) {
 				if x.Index > maxIndex {
 					maxIndex = x.Index
 				}
+				fileSize += uint64(len(x.Bytes))
 				lock.Unlock()
 				hashList.Store(x.Index, x.Hash)
 				_, ok := uniqueHash.LoadOrStore(x.Hash, true)
@@ -137,11 +138,14 @@ func upload(fileName string) {
 		finalList[key.(int)] = value.(string)
 		return true
 	})
+	var fi persist.FileInfo
+	fi.Hashes = finalList
+	fi.Size = fileSize
 
 	// in order to send the list, we encode the slice to a byte format.
 	var listStore bytes.Buffer
 	enc := gob.NewEncoder(&listStore)
-	enc.Encode(finalList)
+	enc.Encode(&fi)
 
 	// and we send
 	if sendHashList(fileName, &listStore) {
@@ -156,7 +160,7 @@ func download(fileName string) {
 	fmt.Println("Workers On Download Pipeline:", env.NUM_DOWNLOAD_WORKERS)
 
 	// add some emotion!
-	bar := pb.StartNew(len(*hashList) * env.MAXIMUM_BLOCK_SIZE).SetUnits(pb.U_BYTES)
+	bar := pb.StartNew(len(hashList.Hashes) * env.MAXIMUM_BLOCK_SIZE).SetUnits(pb.U_BYTES)
 
 	// build the workers
 	workList := make(chan string, env.NUM_DOWNLOAD_WORKERS)
@@ -167,7 +171,7 @@ func download(fileName string) {
 	}
 
 	// do the work
-	for _, x := range *hashList {
+	for _, x := range hashList.Hashes {
 		wantFile := filepath.Join(env.DATASTORE, x)
 		// check if we already have the file locally
 		if !persist.FileExists(wantFile) {
@@ -182,7 +186,7 @@ func download(fileName string) {
 	close(workList)
 	wg.Wait()
 	bar.FinishPrint("Download Complete, rebuilding...")
-	hashing.Rebuild(hashList, env.DATASTORE, fileName+".rebuilt")
+	hashing.Rebuild(&hashList.Hashes, env.DATASTORE, fileName+".rebuilt")
 }
 
 func deleteFile(fileName string) {

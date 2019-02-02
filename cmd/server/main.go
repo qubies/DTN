@@ -53,7 +53,7 @@ func removeLinkCounts(name string) {
 	f := filepath.Join(env.HASHLIST, name)
 	if persist.FileExists(f) {
 		oldHashList := persist.HashListFromFile(f)
-		for _, hash := range *oldHashList {
+		for _, hash := range oldHashList.Hashes {
 			deleteCount(hash)
 		}
 	}
@@ -62,7 +62,7 @@ func removeLinkCounts(name string) {
 func uploadList(c *gin.Context) {
 	fileName, _ := c.GetQuery("fileName")
 	hashData, _ := c.GetRawData()
-	hashList := new([]string)
+	hashList := new(persist.FileInfo)
 	dec := gob.NewDecoder(bytes.NewReader(hashData))
 	err := dec.Decode(hashList)
 	if err != nil {
@@ -93,7 +93,7 @@ func loadRefs() {
 	fmt.Println("Loading Hash List from store")
 	for _, f := range files {
 		thisMeta := persist.HashListFromFile(filepath.Join(env.HASHLIST, f.Name()))
-		for _, hash := range *thisMeta {
+		for _, hash := range thisMeta.Hashes {
 			increaseCount(hash)
 		}
 	}
@@ -143,10 +143,11 @@ func fileList(c *gin.Context) {
 	logging.PanicOnError("Reading file list", err)
 	var resp string
 	for _, file := range files {
+		hl := persist.HashListFromFile(filepath.Join(env.HASHLIST, file.Name()))
 		if resp == "" {
-			resp = file.Name()
+			resp = file.Name() + " Size: " + fmt.Sprint(hl.Size)
 		} else {
-			resp += "\n" + file.Name()
+			resp += "\n" + file.Name() + " Size: " + fmt.Sprint(hl.Size)
 		}
 	}
 	c.String(200, resp)

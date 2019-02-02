@@ -14,6 +14,11 @@ import (
 var WD string
 var tmpFileNum uint32
 
+type FileInfo struct {
+	Hashes []string
+	Size   uint64
+}
+
 // FileObject is a convenience wrapper to a persistent store object.
 type FileWriter struct {
 	FileName string
@@ -74,8 +79,8 @@ func ReadBytes(fileName string) ([]byte, error) {
 	return ioutil.ReadFile(fileName)
 }
 
-func HashListFromFile(filePath string) *[]string {
-	tmp := new([]string)
+func HashListFromFile(filePath string) *FileInfo {
+	tmp := new(FileInfo)
 	gFile, err := os.Open(filePath)
 	defer gFile.Close()
 	if err != nil {
