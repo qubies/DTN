@@ -112,7 +112,7 @@ func sendFileInfo(hashList *sync.Map, fileName string, maxIndex int, fileSize ui
 
 	// and we send
 	if sendHashList(fileName, &listStore) {
-		fmt.Println("File Stored")
+		//
 	}
 }
 
