@@ -62,6 +62,8 @@ func removeLinkCounts(name string) {
 
 func uploadList(c *gin.Context) {
 	fileName, _ := c.GetQuery("fileName")
+	fileName = filepath.Base(fileName)
+	// fmt.Println("fileName", fileName)
 	hashData, _ := c.GetRawData()
 	hashList := new(persist.FileInfo)
 	dec := gob.NewDecoder(bytes.NewReader(hashData))
