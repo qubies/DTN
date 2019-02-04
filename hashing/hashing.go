@@ -73,6 +73,8 @@ func GenerateHashList(fileName string) (chan *FilePart, *pb.ProgressBar) {
 	}
 
 	bar := pb.StartNew(int(fileInfo.Size())).SetUnits(pb.U_BYTES)
+	bar.Start()
+
 	go func() {
 		rd := bufio.NewReader(file)
 		for {
@@ -142,6 +144,7 @@ func Rebuild(hashList *[]string, directory string, finalPath string) {
 	}
 	defer output.Close()
 	bar := pb.StartNew(len(*hashList))
+	bar.Start()
 	for _, x := range *hashList {
 		p, err := os.Open(filepath.Join(directory, x))
 		if err != nil {
