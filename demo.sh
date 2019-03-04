@@ -68,6 +68,7 @@ scp server cybera:~/
 tmux new-session -d -s display
 trap 'handleint' SIGINT
 send "ssh cybera"
+sleep 1
 send "rm -rf ~/.DTN"
 send "./server"
 tmux split-window -h
@@ -156,11 +157,16 @@ echo "if we upload and download again, note that the file will be changed"
 send "./client -u testFiles/testfile3 && ./client -l"
 echo "and we delete our local cache so the file actually collects from the server:"
 wait_u
-rm -rf ~/.DTN
+send "rm -rf ~/.DTN"
 send "./client -d testfile3 && diff testfile3.rebuilt testFiles/testfile3"
 wait_u
 echo "and we can also re download the testfile2, larger file for a good diff:"
 send "./client -d testfile2 && diff testfile2.rebuilt testFiles/testfile2"
+wait_u
+echo "and if we download it again, it will be fully cached on the client side, so fast :)"
+send "./client -d testfile2 && diff testfile2.rebuilt testFiles/testfile2"
+wait_u
+echo "This is the end of the demo. Thanks!!!"
 wait_u
 sed -i -e "1d" testFiles/testfile2
 end
