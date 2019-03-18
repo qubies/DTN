@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"sync"
 	"text/tabwriter"
+	"time"
 )
 
 var references map[string]int
@@ -51,14 +52,37 @@ func increaseCount(hash string) {
 	references[hash]++
 }
 
-func removeLinkCounts(name string, HOH string) {
+func removeLinkCounts(name string, HOH string) error {
 	f := filepath.Join(env.HASHLIST, name)
 	if persist.FileExists(f) {
 		fileRecord := persist.FileRecordFromFile(f)
-		for _, hash := range fileRecord.AllFiles[HOH].Hashes {
-			deleteCount(hash)
+		if _, ok := fileRecord.AllFiles[HOH]; ok {
+			for _, hash := range fileRecord.AllFiles[HOH].Hashes {
+				deleteCount(hash)
+			}
+			delete(fileRecord.AllFiles, HOH)
 		}
+		if len(fileRecord.AllFiles) < 1 {
+			os.Remove(f)
+		} else {
+			if fileRecord.CurrentMainFile.HOH == HOH {
+				var latest time.Time
+				for _, record := range fileRecord.AllFiles {
+					if record.ModifiedDate.Sub(latest) > 0 {
+						fmt.Println("changed main")
+						latest = record.ModifiedDate
+						fileRecord.CurrentMainFile = record
+					}
+
+				}
+			}
+			fileRecord.Write()
+		}
+
+	} else {
+		return errors.New("File not found")
 	}
+	return nil
 }
 
 func appendToFOB(name string, FileObject *persist.FileInfo) {
@@ -166,11 +190,11 @@ func checkHash(c *gin.Context) {
 func deleteFile(c *gin.Context) {
 	fileName, _ := c.GetQuery("fileName")
 	HOH, ok := c.GetQuery("HOH")
-	if !ok {
+	if !ok || HOH == "" {
 		c.String(200, "Remove Failed, you need to specify the HOH to remove")
 	}
-	removeLinkCounts(fileName, HOH)
-	err := os.Remove(filepath.Join(env.HASHLIST, fileName))
+	err := removeLinkCounts(fileName, HOH)
+	// err := os.Remove(filepath.Join(env.HASHLIST, fileName))
 	if err == nil {
 		c.String(200, "ok")
 	} else {

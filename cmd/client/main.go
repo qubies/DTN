@@ -57,8 +57,8 @@ func checkForHashOnServer(hash string) bool {
 	return readResponse(response) == "SEND"
 }
 
-func deleteFileFromServer(fileName string) bool {
-	response, err := http.Get("http://" + env.SERVER_URL + ":" + env.RESTPORT + "/DELETE?fileName=" + fileName)
+func deleteFileFromServer(fileName string, hoh string) bool {
+	response, err := http.Get("http://" + env.SERVER_URL + ":" + env.RESTPORT + "/DELETE?fileName=" + fileName + "&HOH=" + hoh)
 	logging.PanicOnError("DELETE request error", err)
 	return readResponse(response) == "ok"
 }
@@ -216,8 +216,8 @@ func download(fileName string, hoh string) {
 	hashing.Rebuild(&hashList.Hashes, env.DATASTORE, fileName+".rebuilt")
 }
 
-func deleteFile(fileName string) {
-	ok := deleteFileFromServer(fileName)
+func deleteFile(fileName string, hoh string) {
+	ok := deleteFileFromServer(fileName, hoh)
 	if ok {
 		fmt.Println("Successfully Removed", fileName)
 	} else {
@@ -242,7 +242,7 @@ func main() {
 	} else if op == 'd' {
 		download(fileName, input.HOH)
 	} else if op == 'r' {
-		deleteFile(fileName)
+		deleteFile(fileName, input.HOH)
 	} else if op == 'l' {
 		list()
 	}
