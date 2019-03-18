@@ -38,10 +38,10 @@ func deleteCount(hash string) {
 	refLock.Lock()
 	defer refLock.Unlock()
 	references[hash]--
-	if references[hash] <= 0 {
-		os.Remove(filepath.Join(env.DATASTORE, hash))
-		delete(references, hash)
-	}
+	// if references[hash] <= 0 {
+	//     os.Remove(filepath.Join(env.DATASTORE, hash))
+	//     delete(references, hash)
+	// }
 }
 
 func increaseCount(hash string) {
@@ -50,20 +50,35 @@ func increaseCount(hash string) {
 	references[hash]++
 }
 
-func removeLinkCounts(name string) {
+func removeLinkCounts(name string, HOH string) {
 	f := filepath.Join(env.HASHLIST, name)
 	if persist.FileExists(f) {
-		oldHashList := persist.HashListFromFile(f)
-		for _, hash := range oldHashList.Hashes {
+		fileRecord := persist.FileRecordFromFile(f)
+		for _, hash := range fileRecord.AllFiles[HOH].Hashes {
 			deleteCount(hash)
 		}
 	}
 }
 
+func appendToFOB(name string, FileObject *persist.FileInfo) {
+	f := filepath.Join(env.HASHLIST, name)
+	var fileRecord *persist.FileRecord
+	if persist.FileExists(f) {
+		fileRecord = persist.FileRecordFromFile(f)
+	} else {
+		fileRecord = new(persist.FileRecord)
+		fileRecord.AllFiles = make(map[string]*persist.FileInfo)
+		fileRecord.FileName = name
+	}
+	fileRecord.CurrentMainFile = FileObject
+	fileRecord.AllFiles[FileObject.HOH] = FileObject
+	fileRecord.Write()
+
+}
+
 func uploadList(c *gin.Context) {
 	fileName, _ := c.GetQuery("fileName")
 	fileName = filepath.Base(fileName)
-	// fmt.Println("fileName", fileName)
 	hashData, _ := c.GetRawData()
 	hashList := new(persist.FileInfo)
 	dec := gob.NewDecoder(bytes.NewReader(hashData))
@@ -73,8 +88,7 @@ func uploadList(c *gin.Context) {
 		c.String(http.StatusExpectationFailed, "HashList failed to decode")
 		return
 	}
-	removeLinkCounts(fileName)
-	persist.WriteBytes(filepath.Join(env.HASHLIST, fileName), hashData)
+	appendToFOB(fileName, hashList)
 	c.String(200, "ok")
 }
 
@@ -95,9 +109,11 @@ func loadRefs() {
 	logging.PanicOnError("Unable to open hashlist directory", err)
 	fmt.Println("Loading Hash List from store")
 	for _, f := range files {
-		thisMeta := persist.HashListFromFile(filepath.Join(env.HASHLIST, f.Name()))
-		for _, hash := range thisMeta.Hashes {
-			increaseCount(hash)
+		thisMeta := persist.FileRecordFromFile(filepath.Join(env.HASHLIST, f.Name()))
+		for _, hl := range thisMeta.AllFiles {
+			for _, hash := range hl.Hashes {
+				increaseCount(hash)
+			}
 		}
 	}
 	fmt.Println("Cleaning up any unneeded files...")
@@ -132,7 +148,11 @@ func checkHash(c *gin.Context) {
 
 func deleteFile(c *gin.Context) {
 	fileName, _ := c.GetQuery("fileName")
-	removeLinkCounts(fileName)
+	HOH, ok := c.GetQuery("HOH")
+	if !ok {
+		panic("You forgot to send the HOH with your delete... doh")
+	}
+	removeLinkCounts(fileName, HOH)
 	err := os.Remove(filepath.Join(env.HASHLIST, fileName))
 	if err == nil {
 		c.String(200, "ok")
@@ -145,11 +165,13 @@ func fileList(c *gin.Context) {
 	w := tabwriter.NewWriter(c.Writer, 0, 8, 0, ' ', tabwriter.Debug)
 	files, err := ioutil.ReadDir(env.HASHLIST)
 	logging.PanicOnError("Reading file list", err)
-	fmt.Fprintln(w, " Name \t Size (bytes) \t Number of Blocks \t Modified ")
-	fmt.Fprintln(w, "------\t--------------\t------------------\t----------")
+	fmt.Fprintln(w, " Name \t Size (bytes) \t Number of Blocks \t Modified \t            HOH               ")
+	fmt.Fprintln(w, "------\t--------------\t------------------\t----------\t------------------------------")
 	for _, file := range files {
-		hl := persist.HashListFromFile(filepath.Join(env.HASHLIST, file.Name()))
-		fmt.Fprintf(w, " %v \t %v \t %v \t %v\n", file.Name(), hl.Size, len(hl.Hashes), hl.ModifiedDate.Format("Mon Jan _2 15:04:05 2006"))
+		fl := persist.FileRecordFromFile(filepath.Join(env.HASHLIST, file.Name()))
+		for _, hl := range fl.AllFiles {
+			fmt.Fprintf(w, " %v \t %v \t %v \t %v \t %v\n", file.Name(), hl.Size, len(hl.Hashes), hl.ModifiedDate.Format("Mon Jan _2 15:04:05 2006"), hl.HOH)
+		}
 	}
 	w.Flush()
 }

@@ -51,6 +51,7 @@ func BuildEnv() {
 	HASH_WINDOW_SIZE, _ = strconv.Atoi(os.Getenv("HASH_WINDOW_SIZE"))
 
 	persist.WD = WD
+	persist.HASH_STORAGE = HASHLIST
 	logging.LOGFILE = LOGFILE
 	hashing.NUM_WORKERS = NUM_HASH_WORKERS
 	hashing.HASH_WINDOW_SIZE = HASH_WINDOW_SIZE

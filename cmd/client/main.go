@@ -104,6 +104,11 @@ func sendFileInfo(hashList *sync.Map, fileName string, maxIndex int, fileSize ui
 	fi.Hashes = finalList
 	fi.Size = fileSize
 	fi.ModifiedDate = time.Now()
+	buffer := new(bytes.Buffer)
+	for _, hash := range fi.Hashes {
+		buffer.Write([]byte(hash))
+	}
+	fi.HOH = hashing.HashBlock(buffer.Bytes())
 
 	// in order to send the list, we encode the slice to a byte format.
 	var listStore bytes.Buffer

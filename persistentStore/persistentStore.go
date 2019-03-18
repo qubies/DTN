@@ -1,23 +1,40 @@
 package persistentStore
 
 import (
+	"bytes"
 	"encoding/gob"
 	"errors"
 	"fmt"
 	logging "github.com/qubies/DTN/logging"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"sync/atomic"
 	"time"
 )
 
 var WD string
+var HASH_STORAGE string
 var tmpFileNum uint32
 
 type FileInfo struct {
 	Hashes       []string
 	Size         uint64
 	ModifiedDate time.Time
+	HOH          string
+}
+
+func (F *FileRecord) Write() {
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+	enc.Encode(F)
+	WriteBytes(filepath.Join(HASH_STORAGE, F.FileName), buf.Bytes())
+}
+
+type FileRecord struct {
+	FileName        string
+	CurrentMainFile *FileInfo
+	AllFiles        map[string]*FileInfo
 }
 
 // FileObject is a convenience wrapper to a persistent store object.
@@ -80,8 +97,8 @@ func ReadBytes(fileName string) ([]byte, error) {
 	return ioutil.ReadFile(fileName)
 }
 
-func HashListFromFile(filePath string) *FileInfo {
-	tmp := new(FileInfo)
+func FileRecordFromFile(filePath string) *FileRecord {
+	tmp := new(FileRecord)
 	gFile, err := os.Open(filePath)
 	defer gFile.Close()
 	if err != nil {
