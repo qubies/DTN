@@ -7,11 +7,13 @@ import (
 
 var FILENAME string
 var OPERATION byte
+var HOH string
 
 func CollectOptions() (string, byte) {
 	filename_u := getopt.StringLong("upload", 'u', "", "The file you wish to upload")
 	filename_d := getopt.StringLong("download", 'd', "", "The file you wish to download")
 	filename_r := getopt.StringLong("remove", 'r', "", "The file you wish to remove")
+	hoh_tmp := getopt.StringLong("HASH Value", 'h', "", "The specific hash value you wish to target (Remove and Download)")
 	list := getopt.BoolLong("list", 'l', "Get a list of the files on the server by name")
 
 	optHelp := getopt.BoolLong("help", 0, "Help")
@@ -19,6 +21,9 @@ func CollectOptions() (string, byte) {
 	if *optHelp {
 		getopt.Usage()
 		os.Exit(0)
+	}
+	if *hoh_tmp != "" {
+		HOH = *hoh_tmp
 	}
 	if *filename_u != "" {
 		OPERATION = 'u'

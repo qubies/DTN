@@ -69,8 +69,8 @@ func sendHashList(fileName string, data *bytes.Buffer) bool {
 	return readResponse(resp) == "ok"
 }
 
-func getHashList(fileName string) *persist.FileInfo {
-	response, err := http.Get("http://" + env.SERVER_URL + ":" + env.RESTPORT + "/getList?fileName=" + fileName)
+func getHashList(fileName string, hoh string) *persist.FileInfo {
+	response, err := http.Get("http://" + env.SERVER_URL + ":" + env.RESTPORT + "/getList?fileName=" + fileName + "&HOH=" + hoh)
 	logging.PanicOnError("Get Request Hash List", err)
 	if response.StatusCode == http.StatusNotFound {
 		fmt.Println("File Not Found on Server")
@@ -174,11 +174,11 @@ func printCaches(cacheHits, cacheMisses uint64) {
 	fmt.Printf("Cache Hit Ratio: %0.1f%%\n", float64(cacheHits)/float64(cacheMisses+cacheHits)*100)
 }
 
-func download(fileName string) {
+func download(fileName string, hoh string) {
 	var cacheHits uint64
 	var cacheMisses uint64
 	// recreate the file for a test to ./rebuilt.
-	hashList := getHashList(fileName)
+	hashList := getHashList(fileName, hoh)
 
 	fmt.Println("Workers On Download Pipeline:", env.NUM_DOWNLOAD_WORKERS)
 
@@ -240,7 +240,7 @@ func main() {
 		upload(fileName)
 
 	} else if op == 'd' {
-		download(fileName)
+		download(fileName, input.HOH)
 	} else if op == 'r' {
 		deleteFile(fileName)
 	} else if op == 'l' {

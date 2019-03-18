@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/gob"
+	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	env "github.com/qubies/DTN/env"
@@ -95,13 +96,29 @@ func uploadList(c *gin.Context) {
 func getList(c *gin.Context) {
 	//encode and send back the list!!
 	fileName, _ := c.GetQuery("fileName")
-	data, err := persist.ReadBytes(filepath.Join(env.HASHLIST, fileName))
-	if err != nil {
-		logging.FileError("Filename Lookup", filepath.Join(env.HASHLIST, fileName), err)
+	HOH, ok := c.GetQuery("HOH")
+	target := filepath.Join(env.HASHLIST, fileName)
+	fileExists := persist.FileExists(target)
+
+	if !fileExists {
+		logging.FileError("Filename Lookup", filepath.Join(env.HASHLIST, fileName), errors.New("uhoh"))
 		c.String(404, "Not Found")
 		return
 	}
-	c.Data(200, "binary/octet-stream", data)
+
+	FileRecord := persist.FileRecordFromFile(target)
+	if ok {
+		_, ok = FileRecord.AllFiles[HOH]
+	}
+
+	var data bytes.Buffer
+	enc := gob.NewEncoder(&data)
+	if ok {
+		enc.Encode(FileRecord.AllFiles[HOH])
+	} else {
+		enc.Encode(FileRecord.CurrentMainFile)
+	}
+	c.Data(200, "binary/octet-stream", data.Bytes())
 }
 
 func loadRefs() {
@@ -150,7 +167,7 @@ func deleteFile(c *gin.Context) {
 	fileName, _ := c.GetQuery("fileName")
 	HOH, ok := c.GetQuery("HOH")
 	if !ok {
-		panic("You forgot to send the HOH with your delete... doh")
+		c.String(200, "Remove Failed, you need to specify the HOH to remove")
 	}
 	removeLinkCounts(fileName, HOH)
 	err := os.Remove(filepath.Join(env.HASHLIST, fileName))
@@ -165,8 +182,8 @@ func fileList(c *gin.Context) {
 	w := tabwriter.NewWriter(c.Writer, 0, 8, 0, ' ', tabwriter.Debug)
 	files, err := ioutil.ReadDir(env.HASHLIST)
 	logging.PanicOnError("Reading file list", err)
-	fmt.Fprintln(w, " Name \t Size (bytes) \t Number of Blocks \t Modified \t            HOH               ")
-	fmt.Fprintln(w, "------\t--------------\t------------------\t----------\t------------------------------")
+	fmt.Fprintln(w, " Name \t Size (bytes) \t Number of Blocks \t        Modified        \t   HOH    ")
+	fmt.Fprintln(w, "------\t--------------\t------------------\t------------------------\t----------")
 	for _, file := range files {
 		fl := persist.FileRecordFromFile(filepath.Join(env.HASHLIST, file.Name()))
 		for _, hl := range fl.AllFiles {
