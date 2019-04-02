@@ -220,8 +220,8 @@ func fileList(c *gin.Context) {
 func runServer() {
 	// adapted from the gin docs example
 	//initialize the api
-	router := gin.Default()
-	// router := gin.New()
+	// router := gin.Default()
+	router := gin.New()
 
 	router.POST("/deposit", uploadPost)
 	router.GET("/check", checkHash)
