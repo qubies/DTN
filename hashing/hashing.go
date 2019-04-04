@@ -19,6 +19,7 @@ var HASH_WINDOW_SIZE int
 var HASH_MATCHING_STRING string
 var MINIMUM_BLOCK_SIZE int
 var MAXIMUM_BLOCK_SIZE int
+var SHOW_PROGRESS bool
 
 var NUM_WORKERS int
 
@@ -71,9 +72,11 @@ func GenerateHashList(fileName string) (chan *FilePart, *pb.ProgressBar) {
 	if err != nil {
 		// Could not obtain stat, handle error
 	}
-
-	bar := pb.StartNew(int(fileInfo.Size())).SetUnits(pb.U_BYTES)
-	bar.Start()
+	var bar *pb.ProgressBar
+	if SHOW_PROGRESS {
+		bar = pb.StartNew(int(fileInfo.Size())).SetUnits(pb.U_BYTES)
+		bar.Start()
+	}
 
 	go func() {
 		rd := bufio.NewReader(file)
@@ -143,17 +146,24 @@ func Rebuild(hashList *[]string, directory string, finalPath string) {
 		panic("Error creating file:" + err.Error())
 	}
 	defer output.Close()
-	bar := pb.StartNew(len(*hashList))
-	bar.Start()
+	var bar *pb.ProgressBar
+	if SHOW_PROGRESS {
+		bar = pb.StartNew(len(*hashList))
+		bar.Start()
+	}
 	for _, x := range *hashList {
 		p, err := os.Open(filepath.Join(directory, x))
 		if err != nil {
 			panic("Error opening file:" + err.Error())
 		}
 		io.Copy(output, p)
-		bar.Add(1)
+		if SHOW_PROGRESS {
+			bar.Add(1)
+		}
 	}
-	bar.FinishPrint("Rebuild Complete!")
+	if SHOW_PROGRESS {
+		bar.FinishPrint("Rebuild Complete!")
+	}
 }
 
 func HashFile(fileName string) string {

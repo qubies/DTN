@@ -30,9 +30,21 @@ var MAXIMUM_BLOCK_SIZE int
 var HASH_WINDOW_SIZE int
 var HASH_MATCHING_STRING string
 
+var SHOW_PROGRESS bool
+
+// copied from https://codereview.stackexchange.com/questions/108563/reading-environment-variables-of-various-types
+func getenvBool(key string) (bool, error) {
+	s := os.Getenv(key)
+	v, err := strconv.ParseBool(s)
+	if err != nil {
+		return false, err
+	}
+	return v, nil
+}
+
 func BuildEnv() {
 	e.Load(".env")
-
+	var err error
 	WD = os.Getenv("WORKING_DIRECTORY")
 	DATASTORE = os.Getenv("DATASTORE")
 	HASHLIST = os.Getenv("HASH_LIST")
@@ -41,6 +53,10 @@ func BuildEnv() {
 	RESTPORT = os.Getenv("RESTPORT")
 	SERVER_URL = os.Getenv("SERVER_URL")
 	HASH_MATCHING_STRING = os.Getenv("HASH_MATCHING_STRING")
+	SHOW_PROGRESS, err = getenvBool("SHOW_PROGRESS")
+	if err != nil {
+		SHOW_PROGRESS = true
+	}
 	DYNAMIC = strings.ToLower(os.Getenv("DYNAMIC")) == "true"
 
 	NUM_DOWNLOAD_WORKERS, _ = strconv.Atoi(os.Getenv("NUM_DOWNLOAD_WORKERS"))
@@ -59,6 +75,7 @@ func BuildEnv() {
 	hashing.MINIMUM_BLOCK_SIZE = MINIMUM_BLOCK_SIZE
 	hashing.MAXIMUM_BLOCK_SIZE = MAXIMUM_BLOCK_SIZE
 	hashing.DYNAMIC = DYNAMIC
+	hashing.SHOW_PROGRESS = SHOW_PROGRESS
 
 	//if the working directory does not exist, then create it.
 	if _, err := os.Stat(WD); os.IsNotExist(err) {

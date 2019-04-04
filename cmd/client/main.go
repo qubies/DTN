@@ -19,6 +19,8 @@ import (
 	"time"
 )
 
+var SHOW_PROGRESS = env.SHOW_PROGRESS
+
 //number of senders (warning that this will unplug the pipeline to a degree and use more memory)
 
 func readResponse(response *http.Response) string {
@@ -87,7 +89,9 @@ func workDownloads(input chan string, wg *sync.WaitGroup, bar *pb.ProgressBar) {
 	for x := range input {
 		d := getFileBlock(x)
 		persist.WriteBytes(filepath.Join(env.DATASTORE, x), *d)
-		bar.Add(len(*d))
+		if SHOW_PROGRESS {
+			bar.Add(len(*d))
+		}
 	}
 	wg.Done()
 }
@@ -156,7 +160,9 @@ func upload(fileName string) {
 						atomic.AddUint64(&cacheHits, 1)
 					}
 				}
-				bar.Add(len(x.Bytes))
+				if SHOW_PROGRESS {
+					bar.Add(len(x.Bytes))
+				}
 			}
 			wg.Done()
 		}()
@@ -164,7 +170,9 @@ func upload(fileName string) {
 
 	wg.Wait()
 	sendFileInfo(&hashList, fileName, maxIndex, fileSize)
-	bar.FinishPrint("Upload Complete")
+	if SHOW_PROGRESS {
+		bar.FinishPrint("Upload Complete")
+	}
 	printCaches(cacheHits, cacheMisses)
 }
 
@@ -177,14 +185,17 @@ func printCaches(cacheHits, cacheMisses uint64) {
 func download(fileName string, hoh string) {
 	var cacheHits uint64
 	var cacheMisses uint64
+
+	var bar *pb.ProgressBar
 	// recreate the file for a test to ./rebuilt.
 	hashList := getHashList(fileName, hoh)
 
 	fmt.Println("Workers On Download Pipeline:", env.NUM_DOWNLOAD_WORKERS)
 
 	// add some emotion!
-	bar := pb.StartNew(int(hashList.Size)).SetUnits(pb.U_BYTES)
-
+	if env.SHOW_PROGRESS {
+		bar = pb.StartNew(int(hashList.Size)).SetUnits(pb.U_BYTES)
+	}
 	// build the workers
 	workList := make(chan string, env.NUM_DOWNLOAD_WORKERS)
 	var wg sync.WaitGroup
@@ -203,14 +214,18 @@ func download(fileName string, hoh string) {
 		} else {
 			//file found locally
 			atomic.AddUint64(&cacheHits, 1)
-			bar.Add(int(persist.FileSize(wantFile)))
+			if SHOW_PROGRESS {
+				bar.Add(int(persist.FileSize(wantFile)))
+			}
 		}
 	}
 
 	// Clean up
 	close(workList)
 	wg.Wait()
-	bar.FinishPrint("Download Complete.")
+	if SHOW_PROGRESS {
+		bar.FinishPrint("Download Complete.")
+	}
 	printCaches(cacheHits, cacheMisses)
 	fmt.Println("rebuilding...")
 	hashing.Rebuild(&hashList.Hashes, env.DATASTORE, fileName+".rebuilt")
@@ -235,6 +250,7 @@ func main() {
 	env.BuildEnv()
 	fileName, op := input.CollectOptions()
 	logging.Initialize()
+	SHOW_PROGRESS = env.SHOW_PROGRESS
 
 	if op == 'u' {
 		upload(fileName)
