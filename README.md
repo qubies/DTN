@@ -19,3 +19,5 @@ Usage: DTNclient [-l] [-d value] [-h value] [--help] [-r value] [-u value] [para
  -u, --upload=value
              The file you wish to upload
 ```
+
+### Note that downloaded files are given a .rebuilt extension for testing purposes
